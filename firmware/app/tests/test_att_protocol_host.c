@@ -1,0 +1,223 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "att_protocol.h"
+#include "att_storage.h"
+
+typedef struct {
+    char text[512];
+} send_capture_t;
+
+static att_uid_t g_card_uid = {{0xA1, 0xB2, 0xC3, 0xD4}};
+static att_status_t g_read_uid_status = ATT_OK;
+static att_status_t g_issue_status = ATT_OK;
+static att_status_t g_clear_status = ATT_OK;
+static att_person_t g_last_person;
+static att_uid_t g_last_clear_uid;
+static unsigned g_issue_calls;
+static unsigned g_clear_calls;
+
+static void capture_send(const char *line, void *ctx)
+{
+    send_capture_t *capture = (send_capture_t *)ctx;
+    strncat(capture->text, line, sizeof(capture->text) - strlen(capture->text) - 1u);
+}
+
+static void require_int(int condition, const char *message)
+{
+    if (!condition) {
+        fprintf(stderr, "%s\n", message);
+        exit(1);
+    }
+}
+
+static void reset_mocks(void)
+{
+    memset(&g_last_person, 0, sizeof(g_last_person));
+    memset(&g_last_clear_uid, 0, sizeof(g_last_clear_uid));
+    g_card_uid.bytes[0] = 0xA1;
+    g_card_uid.bytes[1] = 0xB2;
+    g_card_uid.bytes[2] = 0xC3;
+    g_card_uid.bytes[3] = 0xD4;
+    g_read_uid_status = ATT_OK;
+    g_issue_status = ATT_OK;
+    g_clear_status = ATT_OK;
+    g_issue_calls = 0u;
+    g_clear_calls = 0u;
+}
+
+static void test_read_returns_uid(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("READ", capture_send, &capture);
+
+    require_int(status == ATT_OK, "READ should return ATT_OK");
+    require_int(strcmp(capture.text, "UID:A1B2C3D4\n") == 0, "READ should return UID line");
+}
+
+static void test_read_maps_no_card(void)
+{
+    reset_mocks();
+    g_read_uid_status = ATT_ERR_NO_CARD;
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("READ", capture_send, &capture);
+
+    require_int(status == ATT_ERR_NO_CARD, "READ should return no-card status");
+    require_int(strcmp(capture.text, "ERR:NO_CARD\n") == 0, "READ should map no card");
+}
+
+static void test_issue_calls_card_writer(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("ISSUE:A1B2C3D4,1001,7,1", capture_send, &capture);
+
+    require_int(status == ATT_OK, "ISSUE should return ATT_OK");
+    require_int(strcmp(capture.text, "OK:ISSUE\n") == 0, "ISSUE should acknowledge write");
+    require_int(g_issue_calls == 1u, "ISSUE should call card writer");
+    require_int(g_last_person.uid.bytes[0] == 0xA1 && g_last_person.uid.bytes[3] == 0xD4,
+                "ISSUE should parse UID");
+    require_int(g_last_person.sid == 1001u, "ISSUE should parse SID");
+    require_int(g_last_person.points == 7u, "ISSUE should parse points");
+    require_int(g_last_person.card_type == ATT_CARD_IMAGE, "ISSUE should parse card type");
+}
+
+static void test_issue_maps_uid_mismatch(void)
+{
+    reset_mocks();
+    g_issue_status = ATT_ERR_CID_MISMATCH;
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("ISSUE:A1B2C3D4,1001,0,0", capture_send, &capture);
+
+    require_int(status == ATT_ERR_CID_MISMATCH, "ISSUE should return mismatch status");
+    require_int(strcmp(capture.text, "ERR:UID_MISMATCH\n") == 0, "ISSUE should map mismatch");
+}
+
+static void test_clear_calls_card_clear(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("CLEAR:A1B2C3D4", capture_send, &capture);
+
+    require_int(status == ATT_OK, "CLEAR should return ATT_OK");
+    require_int(strcmp(capture.text, "OK:CLEAR\n") == 0, "CLEAR should acknowledge clear");
+    require_int(g_clear_calls == 1u, "CLEAR should call card clear");
+    require_int(g_last_clear_uid.bytes[0] == 0xA1 && g_last_clear_uid.bytes[3] == 0xD4,
+                "CLEAR should parse UID");
+}
+
+int main(void)
+{
+    test_read_returns_uid();
+    test_read_maps_no_card();
+    test_issue_calls_card_writer();
+    test_issue_maps_uid_mismatch();
+    test_clear_calls_card_clear();
+    return 0;
+}
+
+att_status_t att_card_init(void)
+{
+    return ATT_OK;
+}
+
+att_status_t att_card_read_uid(att_uid_t *uid)
+{
+    if (uid == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    *uid = g_card_uid;
+    return g_read_uid_status;
+}
+
+att_status_t att_card_issue_checked(const att_person_t *person)
+{
+    if (person == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    g_last_person = *person;
+    g_issue_calls++;
+    return g_issue_status;
+}
+
+att_status_t att_card_clear_checked(const att_uid_t *expected_uid)
+{
+    if (expected_uid == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    g_last_clear_uid = *expected_uid;
+    g_clear_calls++;
+    return g_clear_status;
+}
+
+att_status_t att_storage_init(void)
+{
+    return ATT_OK;
+}
+
+att_status_t att_storage_format(void)
+{
+    return ATT_OK;
+}
+
+att_status_t att_storage_load_config(att_device_config_t *config)
+{
+    if (config == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(config, 0, sizeof(*config));
+    config->device_id = 1u;
+    config->work_mode = ATT_MODE_IN_OUT;
+    config->upload_enable = 1u;
+    return ATT_OK;
+}
+
+att_status_t att_storage_save_config(const att_device_config_t *config)
+{
+    return config == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+}
+
+void att_storage_default_config(att_device_config_t *config)
+{
+    if (config != NULL) {
+        memset(config, 0, sizeof(*config));
+    }
+}
+
+att_status_t att_storage_append_record(const att_record_t *record)
+{
+    return record == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+}
+
+att_status_t att_storage_read_record(uint32_t index, att_record_t *record)
+{
+    (void)index;
+    return record == NULL ? ATT_ERR_INVALID_ARG : ATT_ERR_STORAGE;
+}
+
+att_status_t att_storage_record_count(uint32_t *count)
+{
+    if (count == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    *count = 0u;
+    return ATT_OK;
+}
+
+att_status_t att_storage_mark_uploaded(uint32_t seq)
+{
+    (void)seq;
+    return ATT_OK;
+}
+
+att_status_t att_storage_next_pending_upload(att_record_t *record)
+{
+    return record == NULL ? ATT_ERR_INVALID_ARG : ATT_ERR_NOT_READY;
+}

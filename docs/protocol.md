@@ -39,8 +39,9 @@ Expected replies:
 UID:A1B2C3D4
 OK
 OK:ISSUE
-ERR:NOCARD
-ERR:CID_MISMATCH
+OK:CLEAR
+ERR:NO_CARD
+ERR:UID_MISMATCH
 ERR:CRC
 LIST:COUNT=12
 LIST:END
@@ -52,9 +53,18 @@ When `ISSUE` or `CLEAR` is received, the MCU must:
 
 1. Scan the current RC522 card.
 2. Compare current UID with the UID from the command.
-3. Return `ERR:NOCARD` if no card is present.
-4. Return `ERR:CID_MISMATCH` if UID differs.
+3. Return `ERR:NO_CARD` if no card is present.
+4. Return `ERR:UID_MISMATCH` if UID differs.
 5. Only write or clear the card after the UID matches.
+
+## Host Protocol Test
+
+The firmware protocol handler has a host-side mock test for command routing:
+
+```powershell
+gcc -I firmware/app/Inc firmware/app/tests/test_att_protocol_host.c firmware/app/Src/att_protocol.c firmware/app/Src/att_crc16.c -o firmware/app/tests/test_att_protocol_host.exe
+firmware\app\tests\test_att_protocol_host.exe
+```
 
 ## Network Upload
 
