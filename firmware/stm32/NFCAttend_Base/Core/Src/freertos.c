@@ -51,6 +51,7 @@
 #define KEY_K6  5
 
 #define ATT_SERIAL_RX_QUEUE_DEPTH 4u
+#define ATT_NFC_POLL_INTERVAL_MS 500u
 
 /* USER CODE END PD */
 
@@ -108,16 +109,26 @@ const osThreadAttr_t serialTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
+/* Definitions for nfcTask */
+osThreadId_t nfcTaskHandle;
+const osThreadAttr_t nfcTask_attributes = {
+  .name = "nfcTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void AttendanceApp_Bootstrap(void);
 static void AttendanceSerial_Send(const char *line, void *ctx);
+static uint32_t AttendanceTime_Now(void *ctx);
 static void AttendanceStorage_Bootstrap(void);
 static void AttendanceStorage_PrintStatus(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartLedTask(void *argument);
 void StartSerialTask(void *argument);
+void StartNfcTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -160,6 +171,7 @@ void MX_FREERTOS_Init(void) {
   {
     serialTaskHandle = osThreadNew(StartSerialTask, NULL, &serialTask_attributes);
   }
+  nfcTaskHandle = osThreadNew(StartNfcTask, NULL, &nfcTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -195,6 +207,12 @@ static void AttendanceSerial_Send(const char *line, void *ctx)
   }
 
   printf("%s", line);
+}
+
+static uint32_t AttendanceTime_Now(void *ctx)
+{
+  (void)ctx;
+  return (uint32_t)(osKernelGetTickCount() / 1000u);
 }
 
 static void AttendanceStorage_Bootstrap(void)
@@ -287,6 +305,7 @@ void StartLedTask(void *argument)
   W25QXX_Init();
   AttendanceApp_Bootstrap();
   attendance_app_set_serial_send(AttendanceSerial_Send, &g_uart1Drv);
+  attendance_app_set_time_source(AttendanceTime_Now, NULL);
   if (serialRxQueueHandle != NULL)
   {
     UartDrv_RegisterRxQueue(&g_uart1Drv, serialRxQueueHandle);
@@ -359,6 +378,19 @@ void StartSerialTask(void *argument)
     }
   }
   /* USER CODE END StartSerialTask */
+}
+
+void StartNfcTask(void *argument)
+{
+  /* USER CODE BEGIN StartNfcTask */
+  (void)argument;
+
+  for (;;)
+  {
+    attendance_app_poll_nfc();
+    osDelay(ATT_NFC_POLL_INTERVAL_MS);
+  }
+  /* USER CODE END StartNfcTask */
 }
 
 /* Private application code --------------------------------------------------*/

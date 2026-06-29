@@ -14,7 +14,15 @@ updated: 2026-06-29
 - [x] Compile app modules as standalone ARM objects.
 - [x] Build linked firmware with LittleFS, storage and protocol core modules.
 - [x] Call W25Q128 plus LittleFS storage bootstrap from the FreeRTOS demo task.
-- [ ] Add RC522 card and ESP01S network modules to linked firmware after GPIO/UART6 task integration.
+- [x] Add RC522 card modules to linked firmware.
+- [x] Add USART1 serial line dispatch task and low-frequency NFC polling task.
+- [ ] Add ESP01S network modules to linked firmware after UART6 task integration.
+
+## Host Verification
+
+- [x] `firmware/app/tests/test_att_protocol_host.c` covers card command routing.
+- [x] `firmware/app/tests/test_attendance_serial_host.c` covers USART line buffering.
+- [x] `firmware/app/tests/test_attendance_nfc_host.c` covers local NFC record append, duplicate skipping, no-card silence and storage error logging.
 
 ## Hardware
 
