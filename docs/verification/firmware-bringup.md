@@ -13,13 +13,14 @@ updated: 2026-06-29
 - [x] Add LittleFS, storage and protocol core entries to Makefile.
 - [x] Compile app modules as standalone ARM objects.
 - [x] Build linked firmware with LittleFS, storage and protocol core modules.
+- [x] Call W25Q128 plus LittleFS storage bootstrap from the FreeRTOS demo task.
 - [ ] Add RC522 card and ESP01S network modules to linked firmware after GPIO/UART6 task integration.
 
 ## Hardware
 
 - [ ] W25Q128 ID reads as `0xEF17`.
-- [ ] LittleFS formats and mounts.
-- [ ] `config.bin` defaults are created.
+- [ ] LittleFS formats and mounts on the board.
+- [ ] `config.bin` defaults are created on the board.
 - [ ] `records.bin` append/read passes CRC16.
 - [ ] RC522 reads UID.
 - [ ] `ISSUE` rejects no-card.

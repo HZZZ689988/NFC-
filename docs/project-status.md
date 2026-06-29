@@ -21,6 +21,7 @@ The overall project framework is established. The repository now includes firmwa
 - `server/`: stage-3 TCP upload and heartbeat test server.
 - `docs/requirements.md`: formal project requirements.
 - `docs/reference-materials.md`: reference-material traceability and repository inclusion notes.
+- FreeRTOS demo task now calls the W25Q128/LittleFS storage bootstrap path and reports config status over USART1.
 
 ## Verified On Host
 
@@ -29,6 +30,7 @@ The overall project framework is established. The repository now includes firmwa
 - `make` passed in `firmware/stm32/NFCAttend_Base`.
 - `firmware/app/Src/*.c` passed ARM GCC compile checks as standalone objects.
 - `firmware/stm32/NFCAttend_Base` now links LittleFS plus storage/protocol core modules.
+- `make clean; make` passes after wiring the storage bootstrap into `Core/Src/freertos.c`.
 
 ## Not Yet Hardware Validated
 
@@ -41,5 +43,5 @@ The overall project framework is established. The repository now includes firmwa
 
 - Some original BSP comments are mojibake, but the C interfaces are usable.
 - `firmware/app` is only partially linked. Storage/protocol core is linked; RC522/ESP01S app modules still need GPIO/UART6 task integration.
-- `firmware/app` is not yet called by actual FreeRTOS tasks in `Core/Src/freertos.c`.
+- Only the storage bootstrap path is called by an actual FreeRTOS task; card, protocol and network workflows still need task integration.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.

@@ -30,6 +30,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "att_storage.h"
 #include "usart.h"
 /* USER CODE END Includes */
 
@@ -48,7 +49,6 @@
 #define KEY_K5  4
 #define KEY_K6  5
 
-#define SAVE_ADDR  0  /* W25Q128 中保存 LED 状态的地址 */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -98,8 +98,7 @@ const osThreadAttr_t ledTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-static void LED_SaveState(uint8_t state);
-static uint8_t LED_RestoreState(void);
+static void AttendanceStorage_Bootstrap(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartLedTask(void *argument);
@@ -146,44 +145,33 @@ void MX_FREERTOS_Init(void) {
 
 }
 
-/* ========== LED 状态存储函数 ========== */
-
-/**
-  * @brief  将 LED 状态保存到 W25Q128
-  * @param  state: 要保存的状态字
-  */
-static void LED_SaveState(uint8_t state)
+static void AttendanceStorage_Bootstrap(void)
 {
-  /* 擦除扇区 (4KB, 地址 0 所在的扇区) */
-  W25QXX_Erase_Sector(SAVE_ADDR);
-  W25QXX_Wait_Busy();
-
-  /* 写入状态数据 */
-  W25QXX_Write_NoCheck(&state, SAVE_ADDR, 1);
-  W25QXX_Wait_Busy();
-
-  printf("LED state saved: 0x%02X\r\n", state);
-}
-
-/**
-  * @brief  从 W25Q128 恢复 LED 状态
-  * @retval 保存的状态字, 若无有效数据则返回 0
-  */
-static uint8_t LED_RestoreState(void)
-{
-  uint8_t state = 0;
-
-  /* 读取 W25Q128 ID 检查芯片是否正常 */
   uint16_t id = W25QXX_ReadID();
   printf("W25Q128 ID: 0x%04X\r\n", id);
 
-  /* 读取保存的状态 */
-  W25QXX_Read(&state, SAVE_ADDR, 1);
-  printf("Restored LED state: 0x%02X\r\n", state);
+  att_status_t status = att_storage_init();
+  if (status != ATT_OK)
+  {
+    printf("LittleFS storage init failed: %d\r\n", (int)status);
+    return;
+  }
 
-  return state;
+  att_device_config_t config;
+  status = att_storage_load_config(&config);
+  if (status != ATT_OK)
+  {
+    printf("Device config load failed: %d\r\n", (int)status);
+    return;
+  }
+
+  printf("LittleFS storage ready\r\n");
+  printf("Device config: id=%lu mode=%u upload=%u repeat=%u\r\n",
+         (unsigned long)config.device_id,
+         (unsigned int)config.work_mode,
+         (unsigned int)config.upload_enable,
+         (unsigned int)config.repeat_interval_sec);
 }
-
 /* USER CODE BEGIN Header_StartLedTask */
 /**
   * @brief  W25Q128 存储 LED 状态示例任务
@@ -211,13 +199,12 @@ void StartLedTask(void *argument)
 
   /* 初始化 W25Q128 */
   W25QXX_Init();
-
-  /* 从 W25Q128 恢复上次保存的 LED 状态 */
-  ledState = LED_RestoreState();
+  AttendanceStorage_Bootstrap();
+  ledState = 0;
   LED_SetLeds(ledState);
 
-  printf("W25Q128 Demo Started\r\n");
-  printf("K1=Toggle next  K4=Toggle prev  K3=Save  K6=Restore\r\n");
+  printf("NFC Attendance Storage Demo Started\r\n");
+  printf("K1=Toggle next  K4=Toggle prev  K3/K6=storage status\r\n");
 
   /* Infinite loop */
   for(;;)
@@ -243,18 +230,16 @@ void StartLedTask(void *argument)
       printf("K4: Toggle LED%d, state=0x%02X\r\n", currentLed + 1, ledState);
     }
 
-    /* K3: 保存当前 LED 状态到 W25Q128 */
+    /* K3: report LittleFS ownership */
     if (Key_IsShortPressed(KEY_K3))
     {
-      LED_SaveState(ledState);
+      printf("K3: storage is managed by LittleFS\r\n");
     }
 
-    /* K6: 恢复上次保存的 LED 状态 */
+    /* K6: re-run storage bootstrap */
     if (Key_IsShortPressed(KEY_K6))
     {
-      ledState = LED_RestoreState();
-      LED_SetLeds(ledState);
-      printf("K6: State restored, mask=0x%02X\r\n", ledState);
+      AttendanceStorage_Bootstrap();
     }
 
     osDelay(KEY_SCAN_INTERVAL_MS);  /* 10ms 扫描周期 */

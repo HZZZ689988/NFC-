@@ -45,6 +45,10 @@ void att_storage_default_config(att_device_config_t *config)
 
 att_status_t att_storage_init(void)
 {
+    if (s_mounted) {
+        return ATT_OK;
+    }
+
     int err = lfs_mount(&s_lfs, &g_att_lfs_cfg);
     if (err != 0) {
         err = lfs_format(&s_lfs, &g_att_lfs_cfg);
