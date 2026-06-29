@@ -40,6 +40,11 @@ C_SOURCES =  \
 ../Bsp/w25qxx/w25qxx.c \
 ../Bsp/Key/key.c \
 ../Bsp/LED/led.c \
+../Bsp/NFC/rc522.c \
+../Bsp/NFC/rc522_platform_stm32.c \
+../Bsp/delay/delay_us.c \
+../../app/Src/attendance_app.c \
+../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
 ../../app/Src/att_lfs_port.c \
 ../../app/Src/att_protocol.c \
@@ -166,7 +171,9 @@ AS_INCLUDES =  \
 -I../Bsp/w25qxx \
 -I../Bsp/Key \
 -I../Bsp/LED \
+-I../Bsp/NFC \
 -I../Bsp/UartDrv \
+-I../Bsp/delay \
 -I../../app/Inc \
 -I../../third_party/littlefs
 
@@ -183,7 +190,9 @@ C_INCLUDES =  \
 -I../Bsp/w25qxx \
 -I../Bsp/Key \
 -I../Bsp/LED \
+-I../Bsp/NFC \
 -I../Bsp/UartDrv \
+-I../Bsp/delay \
 -I../../app/Inc \
 -I../../third_party/littlefs
 
