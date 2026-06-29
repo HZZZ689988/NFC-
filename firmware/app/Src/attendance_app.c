@@ -15,6 +15,9 @@
 #include "att_network.h"
 #endif
 
+#define ATT_NETWORK_UPLOAD_INTERVAL_SEC     10u
+#define ATT_NETWORK_HEARTBEAT_INTERVAL_SEC  60u
+
 static att_device_config_t s_config;
 static uint32_t s_next_seq = 1u;
 static att_protocol_send_fn s_serial_send;
@@ -27,6 +30,11 @@ static uint8_t s_serial_line_overflow;
 static att_uid_t s_last_uid;
 static uint32_t s_last_uid_time;
 static uint8_t s_last_uid_valid;
+static uint32_t s_last_network_upload_time;
+static uint32_t s_last_network_heartbeat_time;
+static uint8_t s_network_upload_due;
+static uint8_t s_network_heartbeat_due;
+static uint8_t s_network_ready;
 
 static void default_serial_send(const char *line, void *ctx)
 {
@@ -94,7 +102,9 @@ att_status_t attendance_app_init(void)
 
     (void)att_card_init();
 #if ATT_ENABLE_NETWORK
-    (void)att_network_init(&s_config);
+    s_network_ready = (att_network_init(&s_config) == ATT_OK) ? 1u : 0u;
+#else
+    s_network_ready = 0u;
 #endif
     s_serial_send = default_serial_send;
     s_serial_send_ctx = NULL;
@@ -104,6 +114,10 @@ att_status_t attendance_app_init(void)
     s_serial_line_overflow = 0u;
     s_last_uid_valid = 0u;
     s_last_uid_time = 0u;
+    s_last_network_upload_time = 0u;
+    s_last_network_heartbeat_time = 0u;
+    s_network_upload_due = 1u;
+    s_network_heartbeat_due = 1u;
     memset(&s_last_uid, 0, sizeof(s_last_uid));
     return ATT_OK;
 }
@@ -220,6 +234,28 @@ void attendance_app_poll_serial(void)
 void attendance_app_poll_network(void)
 {
 #if ATT_ENABLE_NETWORK
-    (void)att_network_upload_pending();
+    if (!s_config.upload_enable || s_network_ready == 0u) {
+        return;
+    }
+
+    if (s_time_now == NULL) {
+        s_time_now = default_time_now;
+        s_time_ctx = NULL;
+    }
+
+    uint32_t now = s_time_now(s_time_ctx);
+    if (s_network_heartbeat_due ||
+        (uint32_t)(now - s_last_network_heartbeat_time) >= ATT_NETWORK_HEARTBEAT_INTERVAL_SEC) {
+        (void)att_network_send_heartbeat();
+        s_last_network_heartbeat_time = now;
+        s_network_heartbeat_due = 0u;
+    }
+
+    if (s_network_upload_due ||
+        (uint32_t)(now - s_last_network_upload_time) >= ATT_NETWORK_UPLOAD_INTERVAL_SEC) {
+        (void)att_network_upload_pending();
+        s_last_network_upload_time = now;
+        s_network_upload_due = 0u;
+    }
 #endif
 }

@@ -32,6 +32,7 @@
 /* USER CODE BEGIN Includes */
 #include "attendance_app.h"
 #include "att_storage.h"
+#include "esp01s.h"
 #include "usart.h"
 /* USER CODE END Includes */
 
@@ -52,6 +53,8 @@
 
 #define ATT_SERIAL_RX_QUEUE_DEPTH 4u
 #define ATT_NFC_POLL_INTERVAL_MS 500u
+#define ATT_NETWORK_START_RETRY_MS 30000u
+#define ATT_NETWORK_POLL_INTERVAL_MS 1000u
 
 /* USER CODE END PD */
 
@@ -64,7 +67,10 @@
 /* USER CODE BEGIN Variables */
 /* 串口驱动实例 (用于 printf 调试输出) */
 extern UartDrv_t g_uart1Drv;
+extern UartDrv_t g_uart6Drv;
 static osMessageQueueId_t serialRxQueueHandle;
+static volatile uint8_t attendanceAppReady;
+static uint8_t networkDriverReady;
 
 /* 按键配置: K1~K4 上拉低有效, K5~K6 下拉高有效 */
 static const Key_Config_t keyConfigs[6] = {
@@ -117,9 +123,18 @@ const osThreadAttr_t nfcTask_attributes = {
   .priority = (osPriority_t) osPriorityLow,
 };
 
+/* Definitions for networkTask */
+osThreadId_t networkTaskHandle;
+const osThreadAttr_t networkTask_attributes = {
+  .name = "networkTask",
+  .stack_size = 768 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void AttendanceApp_Bootstrap(void);
+static void AttendanceNetwork_InitDriver(void);
 static void AttendanceSerial_Send(const char *line, void *ctx);
 static uint32_t AttendanceTime_Now(void *ctx);
 static void AttendanceStorage_Bootstrap(void);
@@ -129,6 +144,7 @@ static void AttendanceStorage_PrintStatus(void);
 void StartLedTask(void *argument);
 void StartSerialTask(void *argument);
 void StartNfcTask(void *argument);
+void StartNetworkTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -172,6 +188,7 @@ void MX_FREERTOS_Init(void) {
     serialTaskHandle = osThreadNew(StartSerialTask, NULL, &serialTask_attributes);
   }
   nfcTaskHandle = osThreadNew(StartNfcTask, NULL, &nfcTask_attributes);
+  networkTaskHandle = osThreadNew(StartNetworkTask, NULL, &networkTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -189,7 +206,25 @@ static void AttendanceApp_Bootstrap(void)
     return;
   }
 
+  attendanceAppReady = 1u;
   printf("Attendance app ready\r\n");
+}
+
+static void AttendanceNetwork_InitDriver(void)
+{
+  if (networkDriverReady != 0u)
+  {
+    return;
+  }
+
+  if (!g_uart6Drv.initialized)
+  {
+    UartDrv_Init(&g_uart6Drv, &huart6);
+  }
+
+  ESP01S_Init(&g_uart6Drv);
+  UartDrv_StartRecv(&g_uart6Drv);
+  networkDriverReady = 1u;
 }
 
 static void AttendanceSerial_Send(const char *line, void *ctx)
@@ -303,6 +338,7 @@ void StartLedTask(void *argument)
 
   /* 初始化 W25Q128 */
   W25QXX_Init();
+  AttendanceNetwork_InitDriver();
   AttendanceApp_Bootstrap();
   attendance_app_set_serial_send(AttendanceSerial_Send, &g_uart1Drv);
   attendance_app_set_time_source(AttendanceTime_Now, NULL);
@@ -391,6 +427,38 @@ void StartNfcTask(void *argument)
     osDelay(ATT_NFC_POLL_INTERVAL_MS);
   }
   /* USER CODE END StartNfcTask */
+}
+
+void StartNetworkTask(void *argument)
+{
+  /* USER CODE BEGIN StartNetworkTask */
+  (void)argument;
+
+  while (attendanceAppReady == 0u)
+  {
+    osDelay(100u);
+  }
+
+  for (;;)
+  {
+    AttendanceNetwork_InitDriver();
+    int start_status = ESP01S_Start();
+    if (start_status == 0)
+    {
+      printf("ESP01S network ready\r\n");
+      break;
+    }
+
+    printf("ESP01S network start failed: %d\r\n", start_status);
+    osDelay(ATT_NETWORK_START_RETRY_MS);
+  }
+
+  for (;;)
+  {
+    attendance_app_poll_network();
+    osDelay(ATT_NETWORK_POLL_INTERVAL_MS);
+  }
+  /* USER CODE END StartNetworkTask */
 }
 
 /* Private application code --------------------------------------------------*/

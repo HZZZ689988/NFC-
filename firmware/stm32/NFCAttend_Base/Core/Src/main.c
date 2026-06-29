@@ -53,6 +53,7 @@
 
 /* USER CODE BEGIN PV */
 UartDrv_t g_uart1Drv;
+UartDrv_t g_uart6Drv;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/

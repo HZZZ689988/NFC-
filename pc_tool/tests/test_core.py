@@ -4,6 +4,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT.parent))
 
 from nfc_attendance_tool.database import Database, Person, parse_record_line
 from nfc_attendance_tool.image_codec import build_image_blocks
@@ -18,6 +19,7 @@ from nfc_attendance_tool.protocol import (
     parse_crc_frame,
 )
 from nfc_attendance_tool.serial_client import SerialClient
+from server import server as test_server
 
 
 def test_protocol_commands() -> None:
@@ -29,7 +31,7 @@ def test_protocol_commands() -> None:
 def test_crc16_frame_roundtrip() -> None:
     assert crc16_ccitt_false("123456789") == 0x29B1
     frame = build_crc_frame("PING")
-    assert frame == "$PING*B9E8\n"
+    assert frame == "$PING*6427\n"
     assert parse_crc_frame(frame) == "PING"
 
 
@@ -108,3 +110,31 @@ def test_serial_transact_drains_stale_lines() -> None:
 
     assert fake.writes == [b"READ\n"]
     assert lines == ["UID:A1B2C3D4", "OK"]
+
+
+def test_server_ack_upload_sequence() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        test_server.DATA_DIR = Path(tmp)
+        test_server.LOG_FILE = Path(tmp) / "uploads.log"
+
+        response = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            "UPLOAD:SEQ=42|UID=A1B2C3D4|SID=1001|TYPE=2|TS=1782691200|DEV=1",
+        )
+
+        assert response == "ACK:UPLOAD:42"
+
+
+def _run_tests() -> None:
+    tests = [
+        value
+        for name, value in sorted(globals().items())
+        if name.startswith("test_") and callable(value)
+    ]
+    for test in tests:
+        test()
+
+
+if __name__ == "__main__":
+    _run_tests()
