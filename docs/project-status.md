@@ -33,7 +33,7 @@ The project is in firmware integration and host-verification mode. The STM32 bas
 - `firmware/app/tests/test_att_network_host.c` passed.
 - `firmware/app/tests/test_attendance_network_host.c` passed.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522 and ESP01S app modules linked.
-- Known warning remains: `../Bsp/w25qxx/w25qxx.c:42:13: warning: unused variable 'temp'`.
+- The STM32 firmware build is clean under the current `-Wall` settings.
 
 ## Not Yet Hardware Validated
 

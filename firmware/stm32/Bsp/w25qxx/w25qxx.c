@@ -39,7 +39,6 @@ uint8_t SPI1_ReadWriteByte(uint8_t TxData)
 //初始化SPI FLASH的IO口
 void W25QXX_Init(void)
 {
-    uint8_t temp;
 //    GPIO_InitTypeDef GPIO_Initure;
 
 //    __HAL_RCC_GPIOC_CLK_ENABLE();           //使能GPIOB时钟

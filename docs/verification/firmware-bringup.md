@@ -29,7 +29,7 @@ updated: 2026-06-29
 - [x] `python -m compileall pc_tool server` passes.
 - [x] `python pc_tool/tests/test_core.py` passes, including server `ACK:UPLOAD:<seq>` compatibility.
 - [x] `make clean; make` passes in `firmware/stm32/NFCAttend_Base`.
-- [ ] Resolve known W25QXX build warning: unused local variable `temp` in `W25QXX_Init`.
+- [x] Resolve known W25QXX build warning: unused local variable `temp` in `W25QXX_Init`.
 
 ## Hardware
 
