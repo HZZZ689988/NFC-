@@ -30,6 +30,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "attendance_app.h"
 #include "att_storage.h"
 #include "usart.h"
 /* USER CODE END Includes */
@@ -98,6 +99,7 @@ const osThreadAttr_t ledTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
+static void AttendanceApp_Bootstrap(void);
 static void AttendanceStorage_Bootstrap(void);
 static void AttendanceStorage_PrintStatus(void);
 /* USER CODE END FunctionPrototypes */
@@ -144,6 +146,18 @@ void MX_FREERTOS_Init(void) {
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
+}
+
+static void AttendanceApp_Bootstrap(void)
+{
+  att_status_t status = attendance_app_init();
+  if (status != ATT_OK)
+  {
+    printf("Attendance app init failed: %d\r\n", (int)status);
+    return;
+  }
+
+  printf("Attendance app ready\r\n");
 }
 
 static void AttendanceStorage_Bootstrap(void)
@@ -231,7 +245,7 @@ void StartLedTask(void *argument)
 
   /* 初始化 W25Q128 */
   W25QXX_Init();
-  AttendanceStorage_Bootstrap();
+  AttendanceApp_Bootstrap();
   ledState = 0;
   LED_SetLeds(ledState);
 
