@@ -1,0 +1,4 @@
+{
+  "cortex-debug.armToolchainPath": "C:\\STM32\\arm-none-eabi-gcc\\14.2.1-1.1.1\\.content\\bin",
+  "cortex-debug.openocdPath": "C:\\STM32\\openocd\\0.12.0-7.1\\.content\\bin\\openocd.exe"
+}

@@ -1,0 +1,110 @@
+from pathlib import Path
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from nfc_attendance_tool.database import Database, Person, parse_record_line
+from nfc_attendance_tool.image_codec import build_image_blocks
+from nfc_attendance_tool.protocol import (
+    CardType,
+    PersonPayload,
+    build_clear,
+    build_crc_frame,
+    build_issue,
+    chunk_commands,
+    crc16_ccitt_false,
+    parse_crc_frame,
+)
+from nfc_attendance_tool.serial_client import SerialClient
+
+
+def test_protocol_commands() -> None:
+    payload = PersonPayload("a1 b2 c3 d4", 1001, 0, CardType.IMAGE)
+    assert build_issue(payload) == "ISSUE:A1B2C3D4,1001,0,1\n"
+    assert build_clear("a1-b2-c3-d4") == "CLEAR:A1B2C3D4\n"
+
+
+def test_crc16_frame_roundtrip() -> None:
+    assert crc16_ccitt_false("123456789") == 0x29B1
+    frame = build_crc_frame("PING")
+    assert frame == "$PING*B9E8\n"
+    assert parse_crc_frame(frame) == "PING"
+
+
+def test_issue_rejects_uint32_overflow() -> None:
+    try:
+        build_issue(PersonPayload("A1B2C3D4", 0x1_0000_0000, 0, CardType.IMAGE))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("SID overflow was accepted")
+
+
+def test_image_blocks_shape() -> None:
+    blocks = build_image_blocks(None, "张三", "计算机学院")
+    assert len(blocks.portrait) == 24
+    assert len(blocks.name) == 10
+    assert len(blocks.department) == 10
+    commands = chunk_commands("IMGN", blocks.name)
+    assert commands[0].startswith("IMGN00:")
+    assert commands[-1].startswith("IMGN09:")
+
+
+def test_record_parse() -> None:
+    parsed = parse_record_line("REC:SEQ=7|UID=A1B2C3D4|SID=1001|IN|2026-06-25 09:30:00|DEV=2|OK")
+    assert parsed["seq"] == 7
+    assert parsed["uid_hex"] == "A1B2C3D4"
+    assert parsed["sid"] == 1001
+    assert parsed["record_type"] == "IN"
+    assert parsed["device_id"] == 2
+    assert parsed["status"] == "OK"
+
+
+def test_database_roundtrip() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(Path(tmp) / "attendance.db")
+        db.upsert_person(Person("A1B2C3D4", 1001, "张三", "研发部", 1))
+        assert db.list_people()[0]["name"] == "张三"
+        db.import_record_line("REC:SEQ=1|UID=A1B2C3D4|SID=1001|IN|2026-06-25 09:30:00|DEV=1|OK")
+        assert db.list_attendance()[0]["sid"] == 1001
+        db.close()
+
+
+def test_database_ignores_duplicate_device_seq() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(Path(tmp) / "attendance.db")
+        line = "REC:SEQ=1|UID=A1B2C3D4|SID=1001|IN|2026-06-25 09:30:00|DEV=1|OK"
+        db.import_record_line(line)
+        db.import_record_line(line)
+        assert len(db.list_attendance()) == 1
+        db.close()
+
+
+class FakeSerial:
+    def __init__(self, client: SerialClient | None = None) -> None:
+        self.is_open = True
+        self.writes: list[bytes] = []
+        self.client = client
+
+    def write(self, data: bytes) -> None:
+        self.writes.append(data)
+        if self.client:
+            self.client._line_queue.put("UID:A1B2C3D4")  # type: ignore[attr-defined]
+            self.client._line_queue.put("OK")  # type: ignore[attr-defined]
+
+    def flush(self) -> None:
+        pass
+
+
+def test_serial_transact_drains_stale_lines() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    client._serial = fake  # type: ignore[attr-defined]
+    client._line_queue.put("OK")
+
+    lines = client.transact("READ\n", timeout=0.2)
+
+    assert fake.writes == [b"READ\n"]
+    assert lines == ["UID:A1B2C3D4", "OK"]

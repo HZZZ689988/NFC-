@@ -1,0 +1,18 @@
+# Add this fragment manually to firmware/stm32/NFCAttend_Base/Makefile.
+
+C_SOURCES += \
+../../app/Src/att_card.c \
+../../app/Src/att_crc16.c \
+../../app/Src/att_lfs_port.c \
+../../app/Src/att_network.c \
+../../app/Src/att_protocol.c \
+../../app/Src/att_storage.c \
+../../app/Src/attendance_app.c \
+../../third_party/littlefs/lfs.c \
+../../third_party/littlefs/lfs_util.c
+
+C_INCLUDES += \
+-I../../app/Inc \
+-I../../third_party/littlefs \
+-I../Bsp/NFC \
+-I../Bsp/ESP01
