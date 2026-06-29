@@ -6,8 +6,15 @@
 #include "att_storage.h"
 #include "esp01s.h"
 
+#define ATT_NETWORK_RX_LINE_MAX 63u
+
 static att_device_config_t s_config;
 static uint8_t s_configured;
+static char s_rx_line[ATT_NETWORK_RX_LINE_MAX + 1u];
+static size_t s_rx_line_len;
+static uint8_t s_rx_line_overflow;
+
+static void network_rx_callback(const uint8_t *data, uint16_t len, void *ctx);
 
 static att_status_t copy_config_string(char *dest, size_t dest_len, const char *src)
 {
@@ -29,6 +36,53 @@ static att_status_t copy_config_string(char *dest, size_t dest_len, const char *
     return ATT_OK;
 }
 
+static uint8_t parse_u32(const char *text, uint32_t *value)
+{
+    if (text == NULL || value == NULL || *text == '\0') {
+        return 0u;
+    }
+
+    uint32_t parsed = 0u;
+    const char *p = text;
+    while (*p != '\0') {
+        if (*p < '0' || *p > '9') {
+            return 0u;
+        }
+
+        uint32_t digit = (uint32_t)(*p - '0');
+        if (parsed > (UINT32_MAX - digit) / 10u) {
+            return 0u;
+        }
+        parsed = (parsed * 10u) + digit;
+        p++;
+    }
+
+    *value = parsed;
+    return 1u;
+}
+
+static void handle_rx_line(const char *line)
+{
+    static const char upload_ack_prefix[] = "ACK:UPLOAD:";
+
+    if (line == NULL) {
+        return;
+    }
+
+    if (strncmp(line, upload_ack_prefix, sizeof(upload_ack_prefix) - 1u) == 0) {
+        uint32_t seq = 0u;
+        if (parse_u32(line + sizeof(upload_ack_prefix) - 1u, &seq) != 0u) {
+            (void)att_storage_mark_uploaded(seq);
+        }
+    }
+}
+
+static void network_rx_callback(const uint8_t *data, uint16_t len, void *ctx)
+{
+    (void)ctx;
+    att_network_handle_rx(data, (size_t)len);
+}
+
 att_status_t att_network_init(const att_device_config_t *config)
 {
     if (config == NULL) {
@@ -46,9 +100,12 @@ att_status_t att_network_init(const att_device_config_t *config)
     esp_cfg.tcpPort = config->server_port;
     esp_cfg.ntpTimezone = config->timezone;
     ESP01S_SetConfig(&esp_cfg);
+    ESP01S_RegisterDataCb(network_rx_callback, NULL);
 
     s_config = *config;
     s_configured = 1u;
+    s_rx_line_len = 0u;
+    s_rx_line_overflow = 0u;
 
     return ATT_OK;
 }
@@ -118,4 +175,41 @@ att_status_t att_network_send_heartbeat(void)
     snprintf(frame, sizeof(frame), "HEARTBEAT:DEV=%lu\n", (unsigned long)s_config.device_id);
     ESP01S_SendStr(frame);
     return ATT_OK;
+}
+
+void att_network_handle_rx(const uint8_t *data, size_t len)
+{
+    if (data == NULL) {
+        return;
+    }
+
+    for (size_t i = 0u; i < len; ++i) {
+        uint8_t ch = data[i];
+
+        if (ch == '\r') {
+            continue;
+        }
+
+        if (ch == '\n') {
+            if (s_rx_line_overflow == 0u && s_rx_line_len > 0u) {
+                s_rx_line[s_rx_line_len] = '\0';
+                handle_rx_line(s_rx_line);
+            }
+            s_rx_line_len = 0u;
+            s_rx_line_overflow = 0u;
+            continue;
+        }
+
+        if (s_rx_line_overflow != 0u) {
+            continue;
+        }
+
+        if (s_rx_line_len >= ATT_NETWORK_RX_LINE_MAX) {
+            s_rx_line_len = 0u;
+            s_rx_line_overflow = 1u;
+            continue;
+        }
+
+        s_rx_line[s_rx_line_len++] = (char)ch;
+    }
 }

@@ -24,8 +24,8 @@ updated: 2026-06-29
 - [x] `firmware/app/tests/test_att_protocol_host.c` covers card command routing.
 - [x] `firmware/app/tests/test_attendance_serial_host.c` covers USART line buffering.
 - [x] `firmware/app/tests/test_attendance_nfc_host.c` covers local NFC record append, duplicate skipping, no-card silence and storage error logging.
-- [x] `firmware/app/tests/test_att_network_host.c` covers ESP01S config bounds and network config copying.
-- [x] `firmware/app/tests/test_attendance_network_host.c` covers heartbeat/upload polling schedule and confirms records stay pending without ACK parsing.
+- [x] `firmware/app/tests/test_att_network_host.c` covers ESP01S config bounds, network config copying and upload ACK parsing.
+- [x] `firmware/app/tests/test_attendance_network_host.c` covers heartbeat/upload polling schedule and confirms polling does not mark uploads done without ACK.
 - [x] `python -m compileall pc_tool server` passes.
 - [x] `python pc_tool/tests/test_core.py` passes, including server `ACK:UPLOAD:<seq>` compatibility.
 - [x] `make clean; make` passes in `firmware/stm32/NFCAttend_Base`.

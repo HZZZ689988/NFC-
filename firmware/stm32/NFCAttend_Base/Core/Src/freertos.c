@@ -31,6 +31,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "attendance_app.h"
+#include "att_network.h"
 #include "att_storage.h"
 #include "esp01s.h"
 #include "usart.h"
@@ -52,6 +53,7 @@
 #define KEY_K6  5
 
 #define ATT_SERIAL_RX_QUEUE_DEPTH 4u
+#define ATT_NETWORK_RX_QUEUE_DEPTH 4u
 #define ATT_NFC_POLL_INTERVAL_MS 500u
 #define ATT_NETWORK_START_RETRY_MS 30000u
 #define ATT_NETWORK_POLL_INTERVAL_MS 1000u
@@ -69,6 +71,7 @@
 extern UartDrv_t g_uart1Drv;
 extern UartDrv_t g_uart6Drv;
 static osMessageQueueId_t serialRxQueueHandle;
+static osMessageQueueId_t networkRxQueueHandle;
 static volatile uint8_t attendanceAppReady;
 static uint8_t networkDriverReady;
 
@@ -175,6 +178,9 @@ void MX_FREERTOS_Init(void) {
   serialRxQueueHandle = osMessageQueueNew(ATT_SERIAL_RX_QUEUE_DEPTH,
                                           sizeof(UartDrv_QueueEvent_t),
                                           NULL);
+  networkRxQueueHandle = osMessageQueueNew(ATT_NETWORK_RX_QUEUE_DEPTH,
+                                           sizeof(UartDrv_QueueEvent_t),
+                                           NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -223,6 +229,10 @@ static void AttendanceNetwork_InitDriver(void)
   }
 
   ESP01S_Init(&g_uart6Drv);
+  if (networkRxQueueHandle != NULL)
+  {
+    ESP01S_RegisterRxQueue(networkRxQueueHandle);
+  }
   UartDrv_StartRecv(&g_uart6Drv);
   networkDriverReady = 1u;
 }
@@ -456,6 +466,14 @@ void StartNetworkTask(void *argument)
   for (;;)
   {
     attendance_app_poll_network();
+    if (networkRxQueueHandle != NULL)
+    {
+      UartDrv_QueueEvent_t event;
+      while (osMessageQueueGet(networkRxQueueHandle, &event, NULL, 0u) == osOK)
+      {
+        att_network_handle_rx(event.data, event.len);
+      }
+    }
     osDelay(ATT_NETWORK_POLL_INTERVAL_MS);
   }
   /* USER CODE END StartNetworkTask */

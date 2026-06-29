@@ -36,12 +36,12 @@ updated: 2026-06-29
 - The FreeRTOS runtime now creates USART1 serial, NFC polling and ESP01S network tasks.
 - ESP01S uses USART6, is initialized before `attendance_app_init()` writes stored config into the network layer, and starts WiFi/TCP in its own low-priority task so local attendance is not blocked.
 - `attendance_app_poll_network()` schedules heartbeat every 60 seconds and pending-upload attempts every 10 seconds when upload is enabled.
-- Pending records are not marked uploaded because ACK parsing is not implemented yet.
-- Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds and network polling schedule.
+- ESP01S transparent TCP data is dispatched through a FreeRTOS queue to `att_network_handle_rx()`, which marks records uploaded only after parsing `ACK:UPLOAD:<seq>`.
+- Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing and network polling schedule.
 
 ## Not Done
 
 - RC522 UID read and card block read/write are build-linked but not real-board validated.
 - ESP01S WiFi, TCP, NTP, weather, heartbeat and upload paths are build-linked/scheduled but not real-board validated.
-- Upload ACK parsing and `att_storage_mark_uploaded()` integration are not implemented yet.
+- Upload ACK parsing and `att_storage_mark_uploaded()` integration are host-tested but not real-board validated.
 - No real-board validation has been performed in this repository.

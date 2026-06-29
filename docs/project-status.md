@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in firmware integration and host-verification mode. The STM32 base now links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling and ESP01S network upload scheduling. Hardware validation is still pending.
+The project is in firmware integration and host-verification mode. The STM32 base now links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling and upload ACK handling. Hardware validation is still pending.
 
 ## Implemented
 
@@ -21,7 +21,7 @@ The project is in firmware integration and host-verification mode. The STM32 bas
 - `server/`: stage-3 TCP upload and heartbeat test server.
 - `docs/requirements.md`: formal project requirements.
 - `docs/reference-materials.md`: reference-material traceability and repository inclusion notes.
-- FreeRTOS tasks now initialize the attendance app, dispatch USART1 protocol lines, poll RC522 for local attendance records, initialize ESP01S on USART6 and periodically schedule heartbeat/upload attempts.
+- FreeRTOS tasks now initialize the attendance app, dispatch USART1 protocol lines, poll RC522 for local attendance records, initialize ESP01S on USART6, periodically schedule heartbeat/upload attempts, and dispatch ESP01S TCP ACK lines to the network layer.
 
 ## Verified On Host
 
@@ -45,6 +45,6 @@ The project is in firmware integration and host-verification mode. The STM32 bas
 ## Main Risks
 
 - Some original BSP comments are mojibake, but the C interfaces are usable.
-- Network ACK parsing is not implemented yet, so firmware sends pending uploads but intentionally leaves records pending.
+- Network ACK parsing is host-tested. Firmware marks records uploaded only after receiving `ACK:UPLOAD:<seq>`, but this path still needs board-side ESP01S/TCP validation.
 - ESP01S startup is build-linked and scheduled, but WiFi/TCP/NTP behavior still needs board-side evidence.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.
