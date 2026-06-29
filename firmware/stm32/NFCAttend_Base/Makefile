@@ -43,10 +43,12 @@ C_SOURCES =  \
 ../Bsp/NFC/rc522.c \
 ../Bsp/NFC/rc522_platform_stm32.c \
 ../Bsp/delay/delay_us.c \
+../Bsp/ESP01/esp01s.c \
 ../../app/Src/attendance_app.c \
 ../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
 ../../app/Src/att_lfs_port.c \
+../../app/Src/att_network.c \
 ../../app/Src/att_protocol.c \
 ../../app/Src/att_storage.c \
 ../../third_party/littlefs/lfs.c \
@@ -174,6 +176,7 @@ AS_INCLUDES =  \
 -I../Bsp/NFC \
 -I../Bsp/UartDrv \
 -I../Bsp/delay \
+-I../Bsp/ESP01 \
 -I../../app/Inc \
 -I../../third_party/littlefs
 
@@ -193,6 +196,7 @@ C_INCLUDES =  \
 -I../Bsp/NFC \
 -I../Bsp/UartDrv \
 -I../Bsp/delay \
+-I../Bsp/ESP01 \
 -I../../app/Inc \
 -I../../third_party/littlefs
 

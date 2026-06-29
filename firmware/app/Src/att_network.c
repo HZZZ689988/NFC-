@@ -9,24 +9,46 @@
 static att_device_config_t s_config;
 static uint8_t s_configured;
 
+static att_status_t copy_config_string(char *dest, size_t dest_len, const char *src)
+{
+    if (dest == NULL || src == NULL || dest_len == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    size_t i = 0u;
+    while (i < dest_len - 1u && src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    if (src[i] != '\0') {
+        dest[0] = '\0';
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    dest[i] = '\0';
+    return ATT_OK;
+}
+
 att_status_t att_network_init(const att_device_config_t *config)
 {
     if (config == NULL) {
         return ATT_ERR_INVALID_ARG;
     }
 
-    s_config = *config;
-    s_configured = 1u;
-
     ESP01S_Config_t esp_cfg;
     memset(&esp_cfg, 0, sizeof(esp_cfg));
-    snprintf(esp_cfg.ssid, sizeof(esp_cfg.ssid), "%s", s_config.wifi_ssid);
-    snprintf(esp_cfg.password, sizeof(esp_cfg.password), "%s", s_config.wifi_password);
-    snprintf(esp_cfg.tcpServerIP, sizeof(esp_cfg.tcpServerIP), "%s", s_config.server_host);
-    esp_cfg.tcpPort = s_config.server_port;
-    snprintf(esp_cfg.ntpServer, sizeof(esp_cfg.ntpServer), "%s", "ntp.aliyun.com");
-    esp_cfg.ntpTimezone = s_config.timezone;
+    if (copy_config_string(esp_cfg.ssid, sizeof(esp_cfg.ssid), config->wifi_ssid) != ATT_OK ||
+        copy_config_string(esp_cfg.password, sizeof(esp_cfg.password), config->wifi_password) != ATT_OK ||
+        copy_config_string(esp_cfg.tcpServerIP, sizeof(esp_cfg.tcpServerIP), config->server_host) != ATT_OK ||
+        copy_config_string(esp_cfg.ntpServer, sizeof(esp_cfg.ntpServer), "ntp.aliyun.com") != ATT_OK) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    esp_cfg.tcpPort = config->server_port;
+    esp_cfg.ntpTimezone = config->timezone;
     ESP01S_SetConfig(&esp_cfg);
+
+    s_config = *config;
+    s_configured = 1u;
 
     return ATT_OK;
 }
