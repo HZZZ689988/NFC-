@@ -50,6 +50,8 @@
 #define KEY_K5  4
 #define KEY_K6  5
 
+#define ATT_SERIAL_RX_QUEUE_DEPTH 4u
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,7 +62,8 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 /* 串口驱动实例 (用于 printf 调试输出) */
-static UartDrv_t g_uart1Drv;
+extern UartDrv_t g_uart1Drv;
+static osMessageQueueId_t serialRxQueueHandle;
 
 /* 按键配置: K1~K4 上拉低有效, K5~K6 下拉高有效 */
 static const Key_Config_t keyConfigs[6] = {
@@ -97,14 +100,24 @@ const osThreadAttr_t ledTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
+/* Definitions for serialTask */
+osThreadId_t serialTaskHandle;
+const osThreadAttr_t serialTask_attributes = {
+  .name = "serialTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void AttendanceApp_Bootstrap(void);
+static void AttendanceSerial_Send(const char *line, void *ctx);
 static void AttendanceStorage_Bootstrap(void);
 static void AttendanceStorage_PrintStatus(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartLedTask(void *argument);
+void StartSerialTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -132,6 +145,9 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+  serialRxQueueHandle = osMessageQueueNew(ATT_SERIAL_RX_QUEUE_DEPTH,
+                                          sizeof(UartDrv_QueueEvent_t),
+                                          NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -140,6 +156,10 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  if (serialRxQueueHandle != NULL)
+  {
+    serialTaskHandle = osThreadNew(StartSerialTask, NULL, &serialTask_attributes);
+  }
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -158,6 +178,23 @@ static void AttendanceApp_Bootstrap(void)
   }
 
   printf("Attendance app ready\r\n");
+}
+
+static void AttendanceSerial_Send(const char *line, void *ctx)
+{
+  UartDrv_t *drv = (UartDrv_t *)ctx;
+  if (line == NULL)
+  {
+    return;
+  }
+
+  if (drv != NULL && drv->initialized)
+  {
+    UartDrv_SendStr(drv, line);
+    return;
+  }
+
+  printf("%s", line);
 }
 
 static void AttendanceStorage_Bootstrap(void)
@@ -233,7 +270,10 @@ void StartLedTask(void *argument)
 {
   /* USER CODE BEGIN StartLedTask */
   /* 初始化串口驱动并设置为 printf 调试输出口 */
-  UartDrv_Init(&g_uart1Drv, &huart1);
+  if (!g_uart1Drv.initialized)
+  {
+    UartDrv_Init(&g_uart1Drv, &huart1);
+  }
   UartDrv_SetDebugPort(&g_uart1Drv);
 
   /* 初始化按键驱动 */
@@ -246,6 +286,12 @@ void StartLedTask(void *argument)
   /* 初始化 W25Q128 */
   W25QXX_Init();
   AttendanceApp_Bootstrap();
+  attendance_app_set_serial_send(AttendanceSerial_Send, &g_uart1Drv);
+  if (serialRxQueueHandle != NULL)
+  {
+    UartDrv_RegisterRxQueue(&g_uart1Drv, serialRxQueueHandle);
+    UartDrv_StartRecv(&g_uart1Drv);
+  }
   ledState = 0;
   LED_SetLeds(ledState);
 
@@ -291,6 +337,28 @@ void StartLedTask(void *argument)
     osDelay(KEY_SCAN_INTERVAL_MS);  /* 10ms 扫描周期 */
   }
   /* USER CODE END StartLedTask */
+}
+
+void StartSerialTask(void *argument)
+{
+  /* USER CODE BEGIN StartSerialTask */
+  (void)argument;
+
+  UartDrv_QueueEvent_t event;
+  for (;;)
+  {
+    if (serialRxQueueHandle == NULL)
+    {
+      osDelay(1000);
+      continue;
+    }
+
+    if (osMessageQueueGet(serialRxQueueHandle, &event, NULL, osWaitForever) == osOK)
+    {
+      attendance_app_dispatch_serial_bytes(event.data, event.len);
+    }
+  }
+  /* USER CODE END StartSerialTask */
 }
 
 /* Private application code --------------------------------------------------*/
