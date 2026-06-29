@@ -7,6 +7,8 @@ updated: 2026-06-29
 # Project Index
 
 - [Project status](project-status.md)
+- [Requirements](requirements.md)
+- [Reference materials](reference-materials.md)
 - [Development plan](development-plan.md)
 - [Protocol](protocol.md)
 - [Hardware map](hardware-map.md)

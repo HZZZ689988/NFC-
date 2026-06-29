@@ -9,16 +9,18 @@ status: in-progress
 
 ## Current Focus
 
-整体项目框架已经建立，包含下位机固件底座、应用层框架、LittleFS、上位机、阶段三测试服务端和文档。
+The overall project framework is established. The repository now includes firmware base code, application-layer firmware modules, LittleFS, the upper-computer tool, a stage-3 test server and structured project documentation.
 
 ## Implemented
 
-- `pc_tool/`: Python/Tkinter 上位机，包含串口读写、发卡、图像块、SQLite、考勤导入。
-- `firmware/stm32/NFCAttend_Base/`: 从 `Demo_W25Q128` 整理出的 STM32 HAL/FreeRTOS 底座。
-- `firmware/stm32/Bsp/`: 已纳入 W25Q128、RC522、OLED、ESP01S、UART、Key、LED 等 BSP。
-- `firmware/third_party/littlefs/`: 已纳入 LittleFS 源码。
-- `firmware/app/`: 已建立 CRC16、LittleFS 存储、协议、发卡 UID 检查、网络、应用入口模块。
-- `server/`: 已建立阶段三 TCP 上传测试服务端。
+- `pc_tool/`: Python/Tkinter upper-computer for serial communication, card issuing, image blocks, SQLite records and attendance import.
+- `firmware/stm32/NFCAttend_Base/`: STM32 HAL/FreeRTOS base copied from `Demo_W25Q128`.
+- `firmware/stm32/Bsp/`: BSP drivers for W25Q128, RC522, OLED, ESP01S, UART, Key, LED and related modules.
+- `firmware/third_party/littlefs/`: LittleFS source.
+- `firmware/app/`: CRC16, LittleFS storage, serial protocol, UID consistency card operations, network upload and application entry modules.
+- `server/`: stage-3 TCP upload and heartbeat test server.
+- `docs/requirements.md`: formal project requirements.
+- `docs/reference-materials.md`: reference-material traceability and repository inclusion notes.
 
 ## Verified On Host
 
@@ -29,13 +31,13 @@ status: in-progress
 
 ## Not Yet Hardware Validated
 
-- LittleFS 在 W25Q128 上 mount/format/read/write。
-- RC522 实卡 UID 强制一致发卡。
-- ESP01S WiFi、NTP、天气和 TCP 上传。
-- OLED 页面展示。
+- LittleFS mount/format/read/write on W25Q128.
+- RC522 real-card UID forced-consistency issuing.
+- ESP01S WiFi, NTP, weather and TCP upload.
+- OLED page display.
 
 ## Main Risks
 
-- 现有 BSP 文档和部分注释存在编码损坏，但 C 接口可用。
-- `firmware/app` 还没有接入 `Core/Src/freertos.c` 的实际任务调度。
-- LittleFS 使用整片 W25Q128，若后续有其他裸 Flash 数据区，需要划分偏移区间。
+- Some original BSP comments are mojibake, but the C interfaces are usable.
+- `firmware/app` is not yet integrated into actual FreeRTOS tasks in `Core/Src/freertos.c`.
+- LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.
