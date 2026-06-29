@@ -28,6 +28,7 @@ The overall project framework is established. The repository now includes firmwa
 - `python pc_tool/tests/test_core.py` passed.
 - `make` passed in `firmware/stm32/NFCAttend_Base`.
 - `firmware/app/Src/*.c` passed ARM GCC compile checks as standalone objects.
+- `firmware/stm32/NFCAttend_Base` now links LittleFS plus storage/protocol core modules.
 
 ## Not Yet Hardware Validated
 
@@ -39,5 +40,6 @@ The overall project framework is established. The repository now includes firmwa
 ## Main Risks
 
 - Some original BSP comments are mojibake, but the C interfaces are usable.
-- `firmware/app` is not yet integrated into actual FreeRTOS tasks in `Core/Src/freertos.c`.
+- `firmware/app` is only partially linked. Storage/protocol core is linked; RC522/ESP01S app modules still need GPIO/UART6 task integration.
+- `firmware/app` is not yet called by actual FreeRTOS tasks in `Core/Src/freertos.c`.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.

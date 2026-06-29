@@ -40,6 +40,12 @@ C_SOURCES =  \
 ../Bsp/w25qxx/w25qxx.c \
 ../Bsp/Key/key.c \
 ../Bsp/LED/led.c \
+../../app/Src/att_crc16.c \
+../../app/Src/att_lfs_port.c \
+../../app/Src/att_protocol.c \
+../../app/Src/att_storage.c \
+../../third_party/littlefs/lfs.c \
+../../third_party/littlefs/lfs_util.c \
 Core/Src/main.c \
 Core/Src/gpio.c \
 Core/Src/freertos.c \
@@ -160,7 +166,9 @@ AS_INCLUDES =  \
 -I../Bsp/w25qxx \
 -I../Bsp/Key \
 -I../Bsp/LED \
--I../Bsp/UartDrv
+-I../Bsp/UartDrv \
+-I../../app/Inc \
+-I../../third_party/littlefs
 
 # C includes
 C_INCLUDES =  \
@@ -175,7 +183,9 @@ C_INCLUDES =  \
 -I../Bsp/w25qxx \
 -I../Bsp/Key \
 -I../Bsp/LED \
--I../Bsp/UartDrv
+-I../Bsp/UartDrv \
+-I../../app/Inc \
+-I../../third_party/littlefs
 
 
 # compile gcc flags

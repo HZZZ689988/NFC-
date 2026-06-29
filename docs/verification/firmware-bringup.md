@@ -10,9 +10,10 @@ updated: 2026-06-29
 ## Build
 
 - [x] Build `firmware/stm32/NFCAttend_Base` without app layer.
-- [ ] Add `firmware/app/Makefile.fragment` entries to Makefile.
+- [x] Add LittleFS, storage and protocol core entries to Makefile.
 - [x] Compile app modules as standalone ARM objects.
-- [ ] Build linked firmware with LittleFS and app modules.
+- [x] Build linked firmware with LittleFS, storage and protocol core modules.
+- [ ] Add RC522 card and ESP01S network modules to linked firmware after GPIO/UART6 task integration.
 
 ## Hardware
 
