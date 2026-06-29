@@ -31,6 +31,7 @@ updated: 2026-06-29
 - STM32 base now links LittleFS plus `att_crc16`, `att_lfs_port`, `att_storage` and `att_protocol`.
 - The FreeRTOS LED demo task now initializes W25Q128, mounts/formats LittleFS through `att_storage_init`, loads `config.bin`, and prints the storage state over USART1.
 - `att_storage_init` is idempotent after a successful mount, so the task can re-run the bootstrap status path without remounting an already mounted filesystem.
+- The K3 key now prints a LittleFS storage status line with record count, device id and upload-enable state for board-side smoke testing.
 
 ## Not Done
 

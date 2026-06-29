@@ -99,6 +99,7 @@ const osThreadAttr_t ledTask_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void AttendanceStorage_Bootstrap(void);
+static void AttendanceStorage_PrintStatus(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartLedTask(void *argument);
@@ -172,6 +173,37 @@ static void AttendanceStorage_Bootstrap(void)
          (unsigned int)config.upload_enable,
          (unsigned int)config.repeat_interval_sec);
 }
+
+static void AttendanceStorage_PrintStatus(void)
+{
+  att_status_t status = att_storage_init();
+  if (status != ATT_OK)
+  {
+    printf("Storage status unavailable: %d\r\n", (int)status);
+    return;
+  }
+
+  att_device_config_t config;
+  status = att_storage_load_config(&config);
+  if (status != ATT_OK)
+  {
+    printf("Config status unavailable: %d\r\n", (int)status);
+    return;
+  }
+
+  uint32_t count = 0;
+  status = att_storage_record_count(&count);
+  if (status != ATT_OK)
+  {
+    printf("Record count unavailable: %d\r\n", (int)status);
+    return;
+  }
+
+  printf("Storage status: records=%lu device=%lu upload=%u\r\n",
+         (unsigned long)count,
+         (unsigned long)config.device_id,
+         (unsigned int)config.upload_enable);
+}
 /* USER CODE BEGIN Header_StartLedTask */
 /**
   * @brief  W25Q128 存储 LED 状态示例任务
@@ -233,7 +265,7 @@ void StartLedTask(void *argument)
     /* K3: report LittleFS ownership */
     if (Key_IsShortPressed(KEY_K3))
     {
-      printf("K3: storage is managed by LittleFS\r\n");
+      AttendanceStorage_PrintStatus();
     }
 
     /* K6: re-run storage bootstrap */
