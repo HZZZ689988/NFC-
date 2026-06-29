@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The overall project framework is established. The repository now includes firmware base code, application-layer firmware modules, LittleFS, the upper-computer tool, a stage-3 test server and structured project documentation.
+The project is in firmware integration and host-verification mode. The STM32 base now links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling and ESP01S network upload scheduling. Hardware validation is still pending.
 
 ## Implemented
 
@@ -21,27 +21,30 @@ The overall project framework is established. The repository now includes firmwa
 - `server/`: stage-3 TCP upload and heartbeat test server.
 - `docs/requirements.md`: formal project requirements.
 - `docs/reference-materials.md`: reference-material traceability and repository inclusion notes.
-- FreeRTOS demo task now calls the W25Q128/LittleFS storage bootstrap path and reports config status over USART1.
+- FreeRTOS tasks now initialize the attendance app, dispatch USART1 protocol lines, poll RC522 for local attendance records, initialize ESP01S on USART6 and periodically schedule heartbeat/upload attempts.
 
 ## Verified On Host
 
 - `python -m compileall pc_tool server` passed.
 - `python pc_tool/tests/test_core.py` passed.
-- `make` passed in `firmware/stm32/NFCAttend_Base`.
-- `firmware/app/Src/*.c` passed ARM GCC compile checks as standalone objects.
-- `firmware/stm32/NFCAttend_Base` now links LittleFS plus storage/protocol core modules.
-- `make clean; make` passes after wiring the storage bootstrap into `Core/Src/freertos.c`.
+- `firmware/app/tests/test_att_protocol_host.c` passed.
+- `firmware/app/tests/test_attendance_serial_host.c` passed.
+- `firmware/app/tests/test_attendance_nfc_host.c` passed.
+- `firmware/app/tests/test_att_network_host.c` passed.
+- `firmware/app/tests/test_attendance_network_host.c` passed.
+- `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522 and ESP01S app modules linked.
+- Known warning remains: `../Bsp/w25qxx/w25qxx.c:42:13: warning: unused variable 'temp'`.
 
 ## Not Yet Hardware Validated
 
 - LittleFS mount/format/read/write on W25Q128.
 - RC522 real-card UID forced-consistency issuing.
-- ESP01S WiFi, NTP, weather and TCP upload.
+- ESP01S WiFi, NTP, weather, heartbeat and TCP upload.
 - OLED page display.
 
 ## Main Risks
 
 - Some original BSP comments are mojibake, but the C interfaces are usable.
-- `firmware/app` is only partially linked. Storage/protocol core is linked; RC522/ESP01S app modules still need GPIO/UART6 task integration.
-- Only the storage bootstrap path is called by an actual FreeRTOS task; card, protocol and network workflows still need task integration.
+- Network ACK parsing is not implemented yet, so firmware sends pending uploads but intentionally leaves records pending.
+- ESP01S startup is build-linked and scheduled, but WiFi/TCP/NTP behavior still needs board-side evidence.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.

@@ -16,13 +16,20 @@ updated: 2026-06-29
 - [x] Call W25Q128 plus LittleFS storage bootstrap from the FreeRTOS demo task.
 - [x] Add RC522 card modules to linked firmware.
 - [x] Add USART1 serial line dispatch task and low-frequency NFC polling task.
-- [ ] Add ESP01S network modules to linked firmware after UART6 task integration.
+- [x] Add ESP01S network modules to linked firmware after UART6 task integration.
+- [x] Enable `ATT_ENABLE_NETWORK` in the STM32 Makefile and build the network task path.
 
 ## Host Verification
 
 - [x] `firmware/app/tests/test_att_protocol_host.c` covers card command routing.
 - [x] `firmware/app/tests/test_attendance_serial_host.c` covers USART line buffering.
 - [x] `firmware/app/tests/test_attendance_nfc_host.c` covers local NFC record append, duplicate skipping, no-card silence and storage error logging.
+- [x] `firmware/app/tests/test_att_network_host.c` covers ESP01S config bounds and network config copying.
+- [x] `firmware/app/tests/test_attendance_network_host.c` covers heartbeat/upload polling schedule and confirms records stay pending without ACK parsing.
+- [x] `python -m compileall pc_tool server` passes.
+- [x] `python pc_tool/tests/test_core.py` passes, including server `ACK:UPLOAD:<seq>` compatibility.
+- [x] `make clean; make` passes in `firmware/stm32/NFCAttend_Base`.
+- [ ] Resolve known W25QXX build warning: unused local variable `temp` in `W25QXX_Init`.
 
 ## Hardware
 
