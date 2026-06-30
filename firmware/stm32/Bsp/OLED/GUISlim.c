@@ -67,7 +67,9 @@ static int is_valid_utf8_sequence(const unsigned char* s, size_t len, size_t* co
         if (len < 2) return 0;
         if ((s[1] & 0xC0) != 0x80) return 0;
                 unsigned int code_point = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
-        if (code_point < 0x80) return 0;          if (code_point > 0x7FF) return 0;                  *consumed = 2;
+        if (code_point < 0x80) return 0;
+        if (code_point > 0x7FF) return 0;
+        *consumed = 2;
         return 1;
     }
         if ((s[0] & 0xF0) == 0xE0) {
@@ -77,7 +79,10 @@ static int is_valid_utf8_sequence(const unsigned char* s, size_t len, size_t* co
                 unsigned int code_point = ((s[0] & 0x0F) << 12) | 
                                  ((s[1] & 0x3F) << 6) | 
                                  (s[2] & 0x3F);
-                if (code_point < 0x800) return 0;          if (code_point >= 0xD800 && code_point <= 0xDFFF) return 0;          if (code_point > 0xFFFF) return 0;                  *consumed = 3;
+                if (code_point < 0x800) return 0;
+                if (code_point >= 0xD800 && code_point <= 0xDFFF) return 0;
+                if (code_point > 0xFFFF) return 0;
+                *consumed = 3;
         return 1;
     }
         if ((s[0] & 0xF8) == 0xF0) {
@@ -89,7 +94,9 @@ static int is_valid_utf8_sequence(const unsigned char* s, size_t len, size_t* co
                                  ((s[1] & 0x3F) << 12) | 
                                  ((s[2] & 0x3F) << 6) | 
                                  (s[3] & 0x3F);
-                if (code_point < 0x10000) return 0;          if (code_point > 0x10FFFF) return 0;                  *consumed = 4;
+                if (code_point < 0x10000) return 0;
+                if (code_point > 0x10FFFF) return 0;
+                *consumed = 4;
         return 1;
     }
         return 0;
@@ -100,7 +107,8 @@ static int is_valid_gbk_sequence(const unsigned char* s, size_t len, size_t* con
         if (s[0] <= 0x80) {
         return -1;     }
         if (s[0] >= 0x81 && s[0] <= 0xFE) {
-        if (len < 2) return 0;                  unsigned char second = s[1];
+        if (len < 2) return 0;
+        unsigned char second = s[1];
         if ((second >= 0x40 && second <= 0x7E) || 
             (second >= 0x80 && second <= 0xFE)) {
             *consumed = 2;
