@@ -41,6 +41,7 @@ updated: 2026-06-30
 - [x] `IMGAxx`, `IMGNxx`, `IMGDxx` and `UPDATEIMG` protocol routing has compile-checked tests.
 - [x] Python serial-client tests cover `UID:` and `OK:*` transaction terminators.
 - [x] `att_display.c` and `attendance_app.c` compile as ARM Cortex-M4 objects with display calls linked.
+- [x] `firmware/app/tests/test_att_display_host.c` covers the display status model with a host GUI stub.
 - [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
 - [x] Host tests verify `UPLOAD=0` skips heartbeat/upload while preserving NTP and weather polling.

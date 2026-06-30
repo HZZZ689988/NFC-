@@ -51,6 +51,7 @@ updated: 2026-06-30
 - Local NFC polling appends attendance records with the card account SID and rejects CRC/UID-invalid cards without appending records.
 - `LIST:N` and `LIST:ALL` stream attendance records over serial as `REC:` lines after `LIST:COUNT`.
 - `att_display` keeps a compact OLED status model for device ID, record count, upload enable state, network state and weather text.
+- Host display tests verify the status model renders standby, network, weather and attendance-OK text and releases transient event pages after the hold interval.
 - `att_storage` persists latest weather text in `/weather.txt`; app init reloads it into the OLED model before the next online query.
 - Local NFC polling now pushes attendance OK, duplicate, invalid-card and storage/card-error events to the display model and local LED/buzzer feedback queue.
 - The FreeRTOS display task initializes the OLED GUI/BSP and refreshes standby, attendance-result, network-state and weather-placeholder pages.

@@ -102,6 +102,15 @@ TESTS = (
         ),
     ),
     HostTest(
+        name="test_att_display_host",
+        defines=("ATT_ENABLE_DISPLAY=1",),
+        includes=(TEST_DIR, INC_DIR),
+        sources=(
+            TEST_DIR / "test_att_display_host.c",
+            SRC_DIR / "att_display.c",
+        ),
+    ),
+    HostTest(
         name="test_attendance_network_host",
         defines=("ATT_ENABLE_NETWORK=1",),
         includes=(INC_DIR,),
