@@ -84,6 +84,15 @@ att_status_t att_card_read_uid(att_uid_t *uid)
     return ATT_ERR_NO_CARD;
 }
 
+att_status_t att_card_read_person(att_person_t *person)
+{
+    if (person == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(person, 0, sizeof(*person));
+    return ATT_ERR_NO_CARD;
+}
+
 att_status_t att_card_issue_checked(const att_person_t *person)
 {
     return person == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;

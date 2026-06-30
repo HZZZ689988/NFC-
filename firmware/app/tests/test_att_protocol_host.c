@@ -15,6 +15,8 @@ static att_status_t g_issue_status = ATT_OK;
 static att_status_t g_clear_status = ATT_OK;
 static att_person_t g_last_person;
 static att_uid_t g_last_clear_uid;
+static att_record_t g_records[3];
+static uint32_t g_record_count;
 static unsigned g_issue_calls;
 static unsigned g_clear_calls;
 
@@ -43,6 +45,8 @@ static void reset_mocks(void)
     g_read_uid_status = ATT_OK;
     g_issue_status = ATT_OK;
     g_clear_status = ATT_OK;
+    memset(g_records, 0, sizeof(g_records));
+    g_record_count = 0u;
     g_issue_calls = 0u;
     g_clear_calls = 0u;
 }
@@ -113,6 +117,48 @@ static void test_clear_calls_card_clear(void)
                 "CLEAR should parse UID");
 }
 
+static void test_list_streams_records(void)
+{
+    reset_mocks();
+    g_record_count = 2u;
+    g_records[0].seq = 1u;
+    g_records[0].uid.bytes[0] = 0xA1;
+    g_records[0].uid.bytes[1] = 0xB2;
+    g_records[0].uid.bytes[2] = 0xC3;
+    g_records[0].uid.bytes[3] = 0xD4;
+    g_records[0].sid = 1001u;
+    g_records[0].type = ATT_RECORD_IN;
+    g_records[0].timestamp = 1782691200u;
+    g_records[0].device_id = 7u;
+    g_records[1] = g_records[0];
+    g_records[1].seq = 2u;
+    g_records[1].sid = 1002u;
+    g_records[1].type = ATT_RECORD_OUT;
+
+    send_capture_t capture = {0};
+    att_status_t status = att_protocol_handle_line("LIST:1", capture_send, &capture);
+
+    require_int(status == ATT_OK, "LIST should return ATT_OK");
+    require_int(strcmp(capture.text,
+                       "LIST:COUNT=2\n"
+                       "REC:SEQ=2|UID=A1B2C3D4|SID=1002|OUT|1782691200|DEV=7|OK\n"
+                       "LIST:END\n") == 0,
+                "LIST should stream newest requested record");
+}
+
+static void test_list_rejects_bad_count_before_storage_access(void)
+{
+    reset_mocks();
+    g_record_count = 2u;
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("LIST:BAD", capture_send, &capture);
+
+    require_int(status == ATT_ERR_INVALID_ARG, "bad LIST count should return invalid arg");
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0,
+                "bad LIST count should only report argument error");
+}
+
 int main(void)
 {
     test_read_returns_uid();
@@ -120,6 +166,8 @@ int main(void)
     test_issue_calls_card_writer();
     test_issue_maps_uid_mismatch();
     test_clear_calls_card_clear();
+    test_list_streams_records();
+    test_list_rejects_bad_count_before_storage_access();
     return 0;
 }
 
@@ -134,6 +182,18 @@ att_status_t att_card_read_uid(att_uid_t *uid)
         return ATT_ERR_INVALID_ARG;
     }
     *uid = g_card_uid;
+    return g_read_uid_status;
+}
+
+att_status_t att_card_read_person(att_person_t *person)
+{
+    if (person == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(person, 0, sizeof(*person));
+    person->uid = g_card_uid;
+    person->sid = 1001u;
+    person->card_type = ATT_CARD_NORMAL;
     return g_read_uid_status;
 }
 
@@ -198,8 +258,14 @@ att_status_t att_storage_append_record(const att_record_t *record)
 
 att_status_t att_storage_read_record(uint32_t index, att_record_t *record)
 {
-    (void)index;
-    return record == NULL ? ATT_ERR_INVALID_ARG : ATT_ERR_STORAGE;
+    if (record == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    if (index >= g_record_count) {
+        return ATT_ERR_STORAGE;
+    }
+    *record = g_records[index];
+    return ATT_OK;
 }
 
 att_status_t att_storage_record_count(uint32_t *count)
@@ -207,7 +273,7 @@ att_status_t att_storage_record_count(uint32_t *count)
     if (count == NULL) {
         return ATT_ERR_INVALID_ARG;
     }
-    *count = 0u;
+    *count = g_record_count;
     return ATT_OK;
 }
 

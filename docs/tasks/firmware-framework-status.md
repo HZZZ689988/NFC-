@@ -4,8 +4,8 @@ task: firmware-framework
 implemented: yes
 hardware-validated: no
 done: no
-evidence-level: host-build
-updated: 2026-06-29
+evidence-level: unit-test
+updated: 2026-06-30
 ---
 
 # Firmware Framework Status
@@ -38,10 +38,17 @@ updated: 2026-06-29
 - `attendance_app_poll_network()` schedules heartbeat every 60 seconds and pending-upload attempts every 10 seconds when upload is enabled.
 - ESP01S transparent TCP data is dispatched through a FreeRTOS queue to `att_network_handle_rx()`, which marks records uploaded only after parsing `ACK:UPLOAD:<seq>`.
 - Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing and network polling schedule.
+- `att_card_issue_checked()` writes UID, SID, points, card type and CRC16 to Mifare sector 0 block 1.
+- `att_card_read_person()` reads the same account block, verifies the physical UID against the stored UID and validates CRC16 before exposing person data.
+- Local NFC polling appends attendance records with the card account SID and rejects CRC/UID-invalid cards without appending records.
+- `LIST:N` and `LIST:ALL` stream attendance records over serial as `REC:` lines after `LIST:COUNT`.
 
 ## Not Done
 
 - RC522 UID read and card block read/write are build-linked but not real-board validated.
+- Card account block read/write and CRC invalid-card handling are implemented but not real-board validated.
+- `LIST:N` / `LIST:ALL` record streaming is build-checked but not validated through USART1 against real board storage.
 - ESP01S WiFi, TCP, NTP, weather, heartbeat and upload paths are build-linked/scheduled but not real-board validated.
 - Upload ACK parsing and `att_storage_mark_uploaded()` integration are host-tested but not real-board validated.
+- Native C host test executables were not run on 2026-06-30 because `gcc`, `clang`, `cl` and `zig` are not installed in the current environment; ARM GCC compile-only checks were used instead.
 - No real-board validation has been performed in this repository.

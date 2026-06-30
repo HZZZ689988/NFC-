@@ -44,8 +44,11 @@ ERR:NO_CARD
 ERR:UID_MISMATCH
 ERR:CRC
 LIST:COUNT=12
+REC:SEQ=12|UID=A1B2C3D4|SID=1001|NORMAL|1782691200|DEV=1|OK
 LIST:END
 ```
+
+`LIST:N` returns the newest `N` records. `LIST:ALL` returns every stored record in storage order. Bad list counts return `ERR:ARG` without sending a partial list.
 
 ## UID Forced Consistency
 

@@ -49,6 +49,18 @@ static void uid_to_hex(const att_uid_t *uid, char out[ATT_UID_HEX_LEN + 1u])
     out[ATT_UID_HEX_LEN] = '\0';
 }
 
+static const char *record_type_text(att_record_type_t type)
+{
+    switch (type) {
+    case ATT_RECORD_IN:
+        return "IN";
+    case ATT_RECORD_OUT:
+        return "OUT";
+    default:
+        return "NORMAL";
+    }
+}
+
 static void send_card_status(att_status_t status, const char *ok_line,
                              att_protocol_send_fn send, void *ctx)
 {
@@ -208,14 +220,53 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
     }
 
     if (strncmp(payload, "LIST:", 5) == 0) {
+        uint32_t requested_limit = 0u;
+        uint8_t list_all = (uint8_t)(strcmp(payload + 5, "ALL") == 0);
+        if (!list_all) {
+            char *end = NULL;
+            unsigned long parsed_count = strtoul(payload + 5, &end, 10);
+            if (end == payload + 5 || *end != '\0') {
+                send("ERR:ARG\n", ctx);
+                return ATT_ERR_INVALID_ARG;
+            }
+            requested_limit = (uint32_t)parsed_count;
+        }
+
         uint32_t count = 0u;
         if (att_storage_record_count(&count) != ATT_OK) {
             send("ERR:LIST\n", ctx);
             return ATT_ERR_STORAGE;
         }
-        char response[48];
+
+        char response[96];
         snprintf(response, sizeof(response), "LIST:COUNT=%lu\n", (unsigned long)count);
         send(response, ctx);
+
+        uint32_t requested = list_all ? count : requested_limit;
+        requested = (requested > count) ? count : requested;
+
+        uint32_t start = count > requested ? count - requested : 0u;
+        for (uint32_t i = start; i < count; ++i) {
+            att_record_t record;
+            att_status_t status = att_storage_read_record(i, &record);
+            if (status != ATT_OK) {
+                send("ERR:LIST\n", ctx);
+                return status;
+            }
+
+            char uid_hex[ATT_UID_HEX_LEN + 1u];
+            uid_to_hex(&record.uid, uid_hex);
+            snprintf(response, sizeof(response),
+                     "REC:SEQ=%lu|UID=%s|SID=%lu|%s|%lu|DEV=%lu|OK\n",
+                     (unsigned long)record.seq,
+                     uid_hex,
+                     (unsigned long)record.sid,
+                     record_type_text(record.type),
+                     (unsigned long)record.timestamp,
+                     (unsigned long)record.device_id);
+            send(response, ctx);
+        }
+
         send("LIST:END\n", ctx);
         return ATT_OK;
     }

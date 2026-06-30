@@ -14,6 +14,7 @@ static att_device_config_t g_config;
 static att_uid_t g_card_uid = {{0xA1, 0xB2, 0xC3, 0xD4}};
 static att_status_t g_card_status = ATT_OK;
 static att_status_t g_append_status = ATT_OK;
+static att_status_t g_read_person_status = ATT_OK;
 static att_record_t g_last_record;
 static uint32_t g_record_count;
 static uint32_t g_append_calls;
@@ -62,6 +63,7 @@ static void reset_mocks(void)
     g_card_uid.bytes[3] = 0xD4;
     g_card_status = ATT_OK;
     g_append_status = ATT_OK;
+    g_read_person_status = ATT_OK;
     g_record_count = 0u;
     g_append_calls = 0u;
     g_now_sec = 100u;
@@ -79,6 +81,7 @@ static void test_records_first_card(void)
     require_int(g_last_record.seq == 1u, "first record seq should start at one");
     require_int(g_last_record.timestamp == 100u, "record should use configured time source");
     require_int(g_last_record.device_id == 42u, "record should use loaded device id");
+    require_int(g_last_record.sid == 1001u, "record should use card account SID");
     require_int(g_last_record.uid.bytes[0] == 0xA1 && g_last_record.uid.bytes[3] == 0xD4,
                 "record should contain read UID");
     require_int(strcmp(capture.text, "ATTEND:OK:SEQ=1\n") == 0,
@@ -131,6 +134,20 @@ static void test_no_card_is_silent(void)
     require_int(capture.text[0] == '\0', "no-card should not log");
 }
 
+static void test_invalid_card_is_reported_without_append(void)
+{
+    reset_mocks();
+    g_read_person_status = ATT_ERR_CRC;
+    send_capture_t capture = {0};
+    init_app(&capture);
+
+    attendance_app_poll_nfc();
+
+    require_int(g_append_calls == 0u, "invalid card should not append");
+    require_int(strcmp(capture.text, "ATTEND:ERR:INVALID_CARD\n") == 0,
+                "invalid card should log explicit invalid-card error");
+}
+
 static void test_storage_error_is_reported_without_consuming_seq(void)
 {
     reset_mocks();
@@ -160,6 +177,7 @@ int main(void)
     test_skips_same_uid_inside_repeat_interval();
     test_records_same_uid_after_repeat_interval();
     test_no_card_is_silent();
+    test_invalid_card_is_reported_without_append();
     test_storage_error_is_reported_without_consuming_seq();
     return 0;
 }
@@ -175,6 +193,22 @@ att_status_t att_card_read_uid(att_uid_t *uid)
         return ATT_ERR_INVALID_ARG;
     }
     *uid = g_card_uid;
+    return g_card_status;
+}
+
+att_status_t att_card_read_person(att_person_t *person)
+{
+    if (person == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(person, 0, sizeof(*person));
+    person->uid = g_card_uid;
+    person->sid = 1001u;
+    person->points = 7u;
+    person->card_type = ATT_CARD_NORMAL;
+    if (g_read_person_status != ATT_OK) {
+        return g_read_person_status;
+    }
     return g_card_status;
 }
 

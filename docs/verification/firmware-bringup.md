@@ -2,7 +2,7 @@
 type: verification
 target: firmware
 hardware-validated: no
-updated: 2026-06-29
+updated: 2026-06-30
 ---
 
 # Firmware Bring-Up Checklist
@@ -18,6 +18,7 @@ updated: 2026-06-29
 - [x] Add USART1 serial line dispatch task and low-frequency NFC polling task.
 - [x] Add ESP01S network modules to linked firmware after UART6 task integration.
 - [x] Enable `ATT_ENABLE_NETWORK` in the STM32 Makefile and build the network task path.
+- [x] Add card account read path and serial record streaming path to linked firmware.
 
 ## Host Verification
 
@@ -30,6 +31,10 @@ updated: 2026-06-29
 - [x] `python pc_tool/tests/test_core.py` passes, including server `ACK:UPLOAD:<seq>` compatibility.
 - [x] `make clean; make` passes in `firmware/stm32/NFCAttend_Base`.
 - [x] Resolve known W25QXX build warning: unused local variable `temp` in `W25QXX_Init`.
+- [x] ARM GCC compile-only checks pass for `test_att_protocol_host.c`, `test_attendance_serial_host.c`, `test_attendance_nfc_host.c`, `test_att_network_host.c` and `test_attendance_network_host.c`.
+- [x] `LIST:N` logic has compile-checked tests for streaming newest records and rejecting invalid list counts before sending partial list output.
+- [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
+- [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 
 ## Hardware
 
@@ -41,7 +46,10 @@ updated: 2026-06-29
 - [ ] `ISSUE` rejects no-card.
 - [ ] `ISSUE` rejects mismatched UID.
 - [ ] `ISSUE` writes matching card.
+- [ ] Issued card account block can be read back with matching UID, SID, points, card type and CRC16.
+- [ ] Invalid account block CRC is rejected without appending an attendance record.
 - [ ] USART1 responds to `PING` and `CFG?`.
+- [ ] USART1 `LIST:N` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
 - [ ] ESP01S connects WiFi.
 - [ ] NTP sync updates RTC.
 - [ ] TCP upload reaches `server/server.py`.

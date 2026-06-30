@@ -180,9 +180,13 @@ void attendance_app_dispatch_serial_bytes(const uint8_t *data, size_t len)
 
 void attendance_app_poll_nfc(void)
 {
-    att_uid_t uid;
-    att_status_t status = att_card_read_uid(&uid);
+    att_person_t person;
+    att_status_t status = att_card_read_person(&person);
     if (status == ATT_ERR_NO_CARD) {
+        return;
+    }
+    if (status == ATT_ERR_CRC || status == ATT_ERR_CID_MISMATCH) {
+        send_line("ATTEND:ERR:INVALID_CARD\n");
         return;
     }
     if (status != ATT_OK) {
@@ -196,7 +200,7 @@ void attendance_app_poll_nfc(void)
     }
 
     uint32_t now = s_time_now(s_time_ctx);
-    if (is_duplicate_uid(&uid, now)) {
+    if (is_duplicate_uid(&person.uid, now)) {
         send_line("ATTEND:SKIP:DUPLICATE\n");
         return;
     }
@@ -204,7 +208,8 @@ void attendance_app_poll_nfc(void)
     att_record_t record;
     memset(&record, 0, sizeof(record));
     record.seq = s_next_seq;
-    record.uid = uid;
+    record.uid = person.uid;
+    record.sid = person.sid;
     record.type = ATT_RECORD_NORMAL;
     record.timestamp = now;
     record.device_id = s_config.device_id;
@@ -216,7 +221,7 @@ void attendance_app_poll_nfc(void)
         return;
     }
 
-    s_last_uid = uid;
+    s_last_uid = person.uid;
     s_last_uid_time = now;
     s_last_uid_valid = 1u;
     s_next_seq++;
