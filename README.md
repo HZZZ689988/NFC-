@@ -53,5 +53,14 @@ such as `gcc`, `clang`, `zig` or MSVC `cl`:
 python firmware/app/tests/run_host_tests.py
 ```
 
+Run the main host verification suite:
+
+```powershell
+python tools/run_verification.py
+```
+
+Add `--firmware-build` to include `make clean`, `make` and the ELF segment
+permission check.
+
 The application framework under `firmware/app` is linked into the STM32 base
 Makefile and integrated from `Core/Src/freertos.c`.

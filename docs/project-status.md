@@ -38,6 +38,7 @@ The project is in full-feature firmware integration and host-verification mode. 
 - `python -m compileall pc_tool server` passed.
 - `python pc_tool/tests/test_core.py` passed.
 - `python firmware/app/tests/run_host_tests.py` builds and runs the native C host test executables for protocol routing, USART line buffering, local NFC polling, ESP01S network parsing and network polling schedule.
+- `python tools/run_verification.py` is the default host verification entrypoint; `--firmware-build` adds STM32 clean build and ELF segment permission checks.
 - ARM GCC compile-only checks also passed for the same protocol, serial, NFC and network test sources.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked and no warning lines in the build log.
 - `arm-none-eabi-readelf -l build/Demo_W25Q128.elf` shows the Flash `PT_LOAD` segment as `R E` and RAM `PT_LOAD` segments as `RW`, with no `RWE`/`RWX` load segment.
