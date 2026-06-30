@@ -67,6 +67,13 @@ CCMRAM (xrw)      : ORIGIN = 0x10000000, LENGTH = 64K
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
 }
 
+PHDRS
+{
+  flash PT_LOAD FLAGS(5);   /* PF_R | PF_X */
+  data PT_LOAD FLAGS(6);    /* PF_R | PF_W */
+  ram PT_LOAD FLAGS(6);     /* PF_R | PF_W */
+}
+
 /* Define output sections */
 SECTIONS
 {
@@ -76,7 +83,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -93,7 +100,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >FLASH :flash
 
   /* Constant data goes into FLASH */
   .rodata :
@@ -102,14 +109,14 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   .ARM.extab :
   {
     . = ALIGN(4);
     *(.ARM.extab* .gnu.linkonce.armextab.*)
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   .ARM :
   {
@@ -118,7 +125,7 @@ SECTIONS
     *(.ARM.exidx*)
     __exidx_end = .;
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   .preinit_array :
   {
@@ -127,7 +134,7 @@ SECTIONS
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   .init_array :
   {
@@ -137,7 +144,7 @@ SECTIONS
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   .fini_array :
   {
@@ -147,7 +154,7 @@ SECTIONS
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :flash
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
@@ -164,7 +171,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >RAM AT> FLASH :data
 
   _siccmram = LOADADDR(.ccmram);
 
@@ -174,7 +181,7 @@ SECTIONS
   * If initialized variables will be placed in this section,
   * the startup code needs to be modified to copy the init-values.
   */
-  .ccmram :
+  .ccmram (NOLOAD) :
   {
     . = ALIGN(4);
     _sccmram = .;       /* create a global symbol at ccmram start */
@@ -183,7 +190,7 @@ SECTIONS
 
     . = ALIGN(4);
     _eccmram = .;       /* create a global symbol at ccmram end */
-  } >CCMRAM AT> FLASH
+  } >CCMRAM :ram
 
 
   /* Uninitialized data section */
@@ -200,7 +207,7 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >RAM
+  } >RAM :ram
 
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack :
@@ -211,7 +218,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
+  } >RAM :ram
 
 
 
