@@ -22,6 +22,7 @@ updated: 2026-06-30
 - [x] Add image-card block command handling and same-UID image update session tracking to linked firmware.
 - [x] Add OLED BSP, `att_display` and FreeRTOS display task to linked firmware.
 - [x] Add RTC BSP, NTP-to-RTC write path and `/weather.txt` weather cache path to linked firmware.
+- [x] Add LED BSP, MIDI buzzer BSP and FreeRTOS local feedback routing to linked firmware.
 
 ## Host Verification
 
@@ -41,6 +42,7 @@ updated: 2026-06-30
 - [x] `att_display.c` and `attendance_app.c` compile as ARM Cortex-M4 objects with display calls linked.
 - [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
+- [x] Feedback callback paths and full STM32 firmware compile with LED/MIDI buzzer integration.
 - [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 - [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 - [ ] Clean or suppress inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings after functional bring-up.
@@ -71,3 +73,9 @@ updated: 2026-06-30
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real card events.
 - [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.
 - [ ] LittleFS `/weather.txt` is created/updated after successful weather query and reloaded on reboot.
+- [ ] L1 indicates attendance OK on a real card event.
+- [ ] L2 indicates invalid-card or CRC/UID mismatch rejection.
+- [ ] L3 indicates duplicate attendance skip.
+- [ ] L4 indicates storage/card/network fault.
+- [ ] L5 indicates network-online transition.
+- [ ] TIM3_CH1 PB4 buzzer emits the mapped short tones for attendance and network feedback.

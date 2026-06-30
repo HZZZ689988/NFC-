@@ -40,6 +40,7 @@ C_SOURCES =  \
 ../Bsp/w25qxx/w25qxx.c \
 ../Bsp/Key/key.c \
 ../Bsp/LED/led.c \
+../Bsp/MIDI/midi.c \
 ../Bsp/NFC/rc522.c \
 ../Bsp/NFC/rc522_platform_stm32.c \
 ../Bsp/delay/delay_us.c \
@@ -181,6 +182,7 @@ AS_INCLUDES =  \
 -I../Bsp/w25qxx \
 -I../Bsp/Key \
 -I../Bsp/LED \
+-I../Bsp/MIDI \
 -I../Bsp/NFC \
 -I../Bsp/UartDrv \
 -I../Bsp/delay \
@@ -203,6 +205,7 @@ C_INCLUDES =  \
 -I../Bsp/w25qxx \
 -I../Bsp/Key \
 -I../Bsp/LED \
+-I../Bsp/MIDI \
 -I../Bsp/NFC \
 -I../Bsp/UartDrv \
 -I../Bsp/delay \

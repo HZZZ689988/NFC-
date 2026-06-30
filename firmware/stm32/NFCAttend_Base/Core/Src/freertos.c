@@ -36,7 +36,9 @@
 #include "att_storage.h"
 #include "bsp_rtc.h"
 #include "esp01s.h"
+#include "midi.h"
 #include "rtc.h"
+#include "tim.h"
 #include "usart.h"
 /* USER CODE END Includes */
 
@@ -57,10 +59,12 @@
 
 #define ATT_SERIAL_RX_QUEUE_DEPTH 4u
 #define ATT_NETWORK_RX_QUEUE_DEPTH 4u
+#define ATT_FEEDBACK_QUEUE_DEPTH 8u
 #define ATT_NFC_POLL_INTERVAL_MS 500u
 #define ATT_NETWORK_START_RETRY_MS 30000u
 #define ATT_NETWORK_POLL_INTERVAL_MS 1000u
 #define ATT_DISPLAY_POLL_INTERVAL_MS 500u
+#define ATT_FEEDBACK_LED_HOLD_MS 800u
 
 /* USER CODE END PD */
 
@@ -76,6 +80,7 @@ extern UartDrv_t g_uart1Drv;
 extern UartDrv_t g_uart6Drv;
 static osMessageQueueId_t serialRxQueueHandle;
 static osMessageQueueId_t networkRxQueueHandle;
+static osMessageQueueId_t feedbackQueueHandle;
 static volatile uint8_t attendanceAppReady;
 static uint8_t networkDriverReady;
 
@@ -100,10 +105,10 @@ static const Led_Config_t ledConfigs[7] = {
     { L7_GPIO_Port, L7_Pin, LED_ON_LOW },  /* L7 */
 };
 
-/* LED 状态位: bit0~bit6 对应 L1~L7, 1=亮, 0=灭 */
-static uint8_t ledState = 0;
-/* 当前选中的 LED 索引 (0~6) */
-static uint8_t currentLed = 0;
+static uint8_t feedbackLedActive;
+static uint32_t feedbackLedClearTick;
+
+/* Local LED/buzzer feedback state. */
 /* USER CODE END Variables */
 
 /* Definitions for ledTask */
@@ -151,6 +156,9 @@ const osThreadAttr_t displayTask_attributes = {
 static void AttendanceApp_Bootstrap(void);
 static void AttendanceNetwork_InitDriver(void);
 static void AttendanceSerial_Send(const char *line, void *ctx);
+static void AttendanceFeedback_Send(attendance_feedback_event_t event, void *ctx);
+static void AttendanceFeedback_Play(attendance_feedback_event_t event);
+static void AttendanceFeedback_ClearExpired(void);
 static uint32_t AttendanceTime_Now(void *ctx);
 static uint32_t AttendanceTime_DateTimeToUnix(const BSP_RTC_DateTime_t *dt);
 static void AttendanceStorage_Bootstrap(void);
@@ -195,6 +203,9 @@ void MX_FREERTOS_Init(void) {
   networkRxQueueHandle = osMessageQueueNew(ATT_NETWORK_RX_QUEUE_DEPTH,
                                            sizeof(UartDrv_QueueEvent_t),
                                            NULL);
+  feedbackQueueHandle = osMessageQueueNew(ATT_FEEDBACK_QUEUE_DEPTH,
+                                          sizeof(attendance_feedback_event_t),
+                                          NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -267,6 +278,76 @@ static void AttendanceSerial_Send(const char *line, void *ctx)
   }
 
   printf("%s", line);
+}
+
+static void AttendanceFeedback_Send(attendance_feedback_event_t event, void *ctx)
+{
+  (void)ctx;
+  if (feedbackQueueHandle != NULL)
+  {
+    (void)osMessageQueuePut(feedbackQueueHandle, &event, 0u, 0u);
+  }
+}
+
+static void AttendanceFeedback_Play(attendance_feedback_event_t event)
+{
+  uint8_t led_mask = 0u;
+  uint8_t tune = 0u;
+  uint16_t duration_ms = 0u;
+
+  switch (event)
+  {
+    case ATT_FEEDBACK_ATTEND_OK:
+      led_mask = (uint8_t)(1u << 0);
+      tune = 13u;
+      duration_ms = 120u;
+      break;
+    case ATT_FEEDBACK_CARD_INVALID:
+      led_mask = (uint8_t)(1u << 1);
+      tune = 6u;
+      duration_ms = 220u;
+      break;
+    case ATT_FEEDBACK_ATTEND_DUPLICATE:
+      led_mask = (uint8_t)(1u << 2);
+      tune = 9u;
+      duration_ms = 80u;
+      break;
+    case ATT_FEEDBACK_ERROR:
+    case ATT_FEEDBACK_NETWORK_FAULT:
+      led_mask = (uint8_t)(1u << 3);
+      tune = 4u;
+      duration_ms = 250u;
+      break;
+    case ATT_FEEDBACK_NETWORK_ONLINE:
+      led_mask = (uint8_t)(1u << 4);
+      tune = 15u;
+      duration_ms = 80u;
+      break;
+    default:
+      break;
+  }
+
+  if (led_mask != 0u)
+  {
+    LED_SetLeds(led_mask);
+    feedbackLedActive = 1u;
+    feedbackLedClearTick = osKernelGetTickCount() + ATT_FEEDBACK_LED_HOLD_MS;
+  }
+
+  if (duration_ms != 0u)
+  {
+    MIDI_Beep(tune, duration_ms);
+  }
+}
+
+static void AttendanceFeedback_ClearExpired(void)
+{
+  if (feedbackLedActive != 0u &&
+      (int32_t)(osKernelGetTickCount() - feedbackLedClearTick) >= 0)
+  {
+    LED_SetLeds(0u);
+    feedbackLedActive = 0u;
+  }
 }
 
 static uint32_t AttendanceTime_Now(void *ctx)
@@ -397,6 +478,8 @@ void StartLedTask(void *argument)
   /* 初始化 LED 驱动 (初始化后全灭) */
   LED_Init(ledConfigs, 7);
   LED_SetLeds(0x00);
+  MIDI_Init(&htim3, TIM_CHANNEL_1);
+  MIDI_SetVolume(30u);
 
   /* 初始化 W25Q128 */
   W25QXX_Init();
@@ -404,16 +487,17 @@ void StartLedTask(void *argument)
   AttendanceApp_Bootstrap();
   attendance_app_set_serial_send(AttendanceSerial_Send, &g_uart1Drv);
   attendance_app_set_time_source(AttendanceTime_Now, NULL);
+  attendance_app_set_feedback(AttendanceFeedback_Send, NULL);
   if (serialRxQueueHandle != NULL)
   {
     UartDrv_RegisterRxQueue(&g_uart1Drv, serialRxQueueHandle);
     UartDrv_StartRecv(&g_uart1Drv);
   }
-  ledState = 0;
-  LED_SetLeds(ledState);
+  feedbackLedActive = 0u;
+  LED_SetLeds(0u);
 
-  printf("NFC Attendance Storage Demo Started\r\n");
-  printf("K1=Toggle next  K4=Toggle prev  K3/K6=storage status\r\n");
+  printf("NFC Attendance app started\r\n");
+  printf("K3=status K6=storage bootstrap L1=OK L2=invalid L3=duplicate L4=fault L5=network\r\n");
 
   /* Infinite loop */
   for(;;)
@@ -421,23 +505,17 @@ void StartLedTask(void *argument)
     /* 按键扫描 (每 10ms 调用一次) */
     Key_Scan();
 
-    /* K1: 切换当前 LED 的亮灭状态, 然后移到下一个 LED */
-    if (Key_IsShortPressed(KEY_K1) || Key_IsRepeat(KEY_K1))
+    if (feedbackQueueHandle != NULL)
     {
-      ledState ^= (1 << currentLed);              /* 切换当前 LED */
-      LED_SetLeds(ledState);
-      currentLed = (currentLed + 1) % 7;          /* 移到下一个 */
-      printf("K1: Toggle LED%d, state=0x%02X\r\n", currentLed + 1, ledState);
+      attendance_feedback_event_t event;
+      while (osMessageQueueGet(feedbackQueueHandle, &event, NULL, 0u) == osOK)
+      {
+        AttendanceFeedback_Play(event);
+      }
     }
 
-    /* K4: 切换上一个 LED 的亮灭状态 (反向调节) */
-    if (Key_IsShortPressed(KEY_K4) || Key_IsRepeat(KEY_K4))
-    {
-      currentLed = (currentLed == 0) ? 6 : (currentLed - 1);
-      ledState ^= (1 << currentLed);              /* 切换当前 LED */
-      LED_SetLeds(ledState);
-      printf("K4: Toggle LED%d, state=0x%02X\r\n", currentLed + 1, ledState);
-    }
+    AttendanceFeedback_ClearExpired();
+    MIDI_Tick();
 
     /* K3: report LittleFS ownership */
     if (Key_IsShortPressed(KEY_K3))
