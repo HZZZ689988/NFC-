@@ -46,4 +46,12 @@ cd firmware/stm32/NFCAttend_Base
 make
 ```
 
-The application framework under `firmware/app` is intended to be added to the STM32 base Makefile after the task code is integrated into `Core/Src/freertos.c`.
+Run the firmware application host tests after installing a native C compiler
+such as `gcc`, `clang`, `zig` or MSVC `cl`:
+
+```powershell
+python firmware/app/tests/run_host_tests.py
+```
+
+The application framework under `firmware/app` is linked into the STM32 base
+Makefile and integrated from `Core/Src/freertos.c`.

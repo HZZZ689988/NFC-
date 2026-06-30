@@ -48,6 +48,7 @@ updated: 2026-06-30
 - [x] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 - [x] Clean inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
 - [x] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
+- [x] `python firmware/app/tests/run_host_tests.py` builds and runs all native C host test executables from a temporary directory.
 
 ## Hardware
 

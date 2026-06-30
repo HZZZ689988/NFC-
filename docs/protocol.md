@@ -115,11 +115,13 @@ When `ISSUE` or `CLEAR` is received, the MCU must:
 
 ## Host Protocol Test
 
-The firmware protocol handler has a host-side mock test for command routing:
+Firmware host-side mock tests cover protocol routing, USART line buffering,
+local NFC polling and network polling/parsing. The runner selects `gcc`,
+`clang`, `zig` or MSVC `cl`, then builds temporary executables outside the
+repository:
 
 ```powershell
-gcc -I firmware/app/Inc firmware/app/tests/test_att_protocol_host.c firmware/app/Src/att_protocol.c firmware/app/Src/att_crc16.c -o firmware/app/tests/test_att_protocol_host.exe
-firmware\app\tests\test_att_protocol_host.exe
+python firmware/app/tests/run_host_tests.py
 ```
 
 ## Network Upload

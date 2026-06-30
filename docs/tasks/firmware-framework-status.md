@@ -59,6 +59,7 @@ updated: 2026-06-30
 - The linked firmware build no longer emits inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
 - The STM32 linker script now emits separate Flash `R E` and RAM `RW` `PT_LOAD` segments instead of an `RWE` Flash load segment.
 - Native C host executables now run and pass for the protocol, serial, NFC and network polling/parsing test sources.
+- `firmware/app/tests/run_host_tests.py` provides a reusable native host-test runner that auto-selects `gcc`, `clang`, `zig` or MSVC `cl` and keeps generated executables outside the repository.
 
 ## Not Done
 
