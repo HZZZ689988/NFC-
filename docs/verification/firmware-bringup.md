@@ -45,9 +45,9 @@ updated: 2026-06-30
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
 - [x] Feedback callback paths and full STM32 firmware compile with LED/MIDI buzzer integration.
 - [x] Protocol and Python tests cover `CFG:` config command construction, persistence and runtime apply callback paths.
+- [x] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
+- [x] Clean inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
 - [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
-- [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
-- [ ] Clean or suppress inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings after functional bring-up.
 
 ## Hardware
 

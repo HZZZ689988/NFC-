@@ -56,6 +56,8 @@ updated: 2026-06-30
 - The old manual LED demo loop is replaced with attendance feedback routing: L1=OK, L2=invalid card, L3=duplicate, L4=fault/network fault, L5=network online, with short TIM3_CH1 `MIDI_Beep()` tones.
 - `CFG:` serial commands persist device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone fields into `/config.bin`; the upper-computer device-config tab sends those updates in buffer-safe segments.
 - `attendance_app` applies saved config updates back into the display model and network config path without requiring a reset.
+- The linked firmware build no longer emits inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
+- The STM32 linker script now emits separate Flash `R E` and RAM `RW` `PT_LOAD` segments instead of an `RWE` Flash load segment.
 
 ## Not Done
 

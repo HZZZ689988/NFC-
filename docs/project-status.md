@@ -38,8 +38,9 @@ The project is in full-feature firmware integration and host-verification mode. 
 - `python -m compileall pc_tool server` passed.
 - `python pc_tool/tests/test_core.py` passed.
 - ARM GCC compile-only checks passed for the protocol, serial, NFC and network test sources because no native C compiler is installed in the current environment.
-- `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked.
-- STM32 firmware size after this slice: `text=98928`, `data=488`, `bss=46776`.
+- `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked and no warning lines in the build log.
+- `arm-none-eabi-readelf -l build/Demo_W25Q128.elf` shows the Flash `PT_LOAD` segment as `R E` and RAM `PT_LOAD` segments as `RW`, with no `RWE`/`RWX` load segment.
+- STM32 firmware size after this slice: `text=99456`, `data=496`, `bss=46480`.
 
 ## Not Yet Hardware Validated
 
@@ -56,8 +57,7 @@ The project is in full-feature firmware integration and host-verification mode. 
 
 ## Main Risks
 
-- Some original BSP comments are mojibake, but the C interfaces are usable. OLED `GUISlim.c` also emits existing `-Wmisleading-indentation` warnings during the linked build.
+- Some original BSP comments are mojibake, but the C interfaces are usable.
 - Network ACK parsing is host-tested. Firmware marks records uploaded only after receiving `ACK:UPLOAD:<seq>`, but this path still needs board-side ESP01S/TCP validation.
 - ESP01S startup is build-linked and scheduled, but WiFi/TCP/NTP/weather behavior still needs board-side evidence.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.
-- The STM32 linker still warns that `build/Demo_W25Q128.elf` has a LOAD segment with RWX permissions; this is build-linked but should be cleaned up in the linker script.
