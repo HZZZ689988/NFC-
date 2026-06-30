@@ -47,7 +47,7 @@ updated: 2026-06-30
 - [x] Protocol and Python tests cover `CFG:` config command construction, persistence and runtime apply callback paths.
 - [x] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 - [x] Clean inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
-- [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
+- [x] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 
 ## Hardware
 

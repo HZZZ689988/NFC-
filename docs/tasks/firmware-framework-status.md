@@ -58,6 +58,7 @@ updated: 2026-06-30
 - `attendance_app` applies saved config updates back into the display model and network config path without requiring a reset.
 - The linked firmware build no longer emits inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
 - The STM32 linker script now emits separate Flash `R E` and RAM `RW` `PT_LOAD` segments instead of an `RWE` Flash load segment.
+- Native C host executables now run and pass for the protocol, serial, NFC and network polling/parsing test sources.
 
 ## Not Done
 
@@ -71,5 +72,4 @@ updated: 2026-06-30
 - OLED GUI/BSP and display task are build-linked but not real-board validated on I2C1 PB6/PB7.
 - LED and TIM3_CH1 buzzer feedback routing is build-linked but not real-board validated on PE8-PE12/PB4.
 - Upload ACK parsing and `att_storage_mark_uploaded()` integration are host-tested but not real-board validated.
-- Native C host test executables were not run on 2026-06-30 because `gcc`, `clang`, `cl` and `zig` are not installed in the current environment; ARM GCC compile-only checks were used instead.
 - No real-board validation has been performed in this repository.

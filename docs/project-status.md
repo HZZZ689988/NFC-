@@ -37,7 +37,8 @@ The project is in full-feature firmware integration and host-verification mode. 
 
 - `python -m compileall pc_tool server` passed.
 - `python pc_tool/tests/test_core.py` passed.
-- ARM GCC compile-only checks passed for the protocol, serial, NFC and network test sources because no native C compiler is installed in the current environment.
+- Native C host test executables ran and passed for protocol routing, USART line buffering, local NFC polling, ESP01S network parsing and network polling schedule.
+- ARM GCC compile-only checks also passed for the same protocol, serial, NFC and network test sources.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked and no warning lines in the build log.
 - `arm-none-eabi-readelf -l build/Demo_W25Q128.elf` shows the Flash `PT_LOAD` segment as `R E` and RAM `PT_LOAD` segments as `RW`, with no `RWE`/`RWX` load segment.
 - STM32 firmware size after this slice: `text=99456`, `data=496`, `bss=46480`.
