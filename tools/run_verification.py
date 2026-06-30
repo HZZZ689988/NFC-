@@ -50,6 +50,7 @@ def main() -> int:
     try:
         run([sys.executable, "-m", "compileall", "pc_tool", "server"])
         run([sys.executable, "pc_tool/tests/test_core.py"])
+        run([sys.executable, "firmware/app/tests/test_run_host_tests_py.py"])
         run([sys.executable, "firmware/app/tests/run_host_tests.py"])
         run(["git", "diff", "--check"])
 

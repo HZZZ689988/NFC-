@@ -49,6 +49,7 @@ updated: 2026-06-30
 - [x] Clean inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings.
 - [x] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 - [x] `python firmware/app/tests/run_host_tests.py` builds and runs all native C host test executables from a temporary directory.
+- [x] `python firmware/app/tests/test_run_host_tests_py.py` covers host runner command generation, including MSVC object output placement.
 - [x] `python tools/run_verification.py` runs Python compile checks, upper-computer/server tests, native C host tests and `git diff --check`.
 - [x] `python tools/run_verification.py --firmware-build` additionally runs STM32 clean build and ELF segment permission checks.
 

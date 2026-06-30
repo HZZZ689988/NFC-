@@ -159,6 +159,7 @@ def compile_cmd(toolchain: Toolchain, test: HostTest, display_stub: Path, exe: P
             + [f"/D{define}" for define in test.defines]
             + [f"/I{path}" for path in test.includes]
             + [str(path) for path in sources]
+            + [f"/Fo:{exe.parent}{os.sep}"]
             + [f"/Fe:{exe}"]
         )
 
