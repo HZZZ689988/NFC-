@@ -43,6 +43,7 @@ updated: 2026-06-30
 - [x] `att_display.c` and `attendance_app.c` compile as ARM Cortex-M4 objects with display calls linked.
 - [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
+- [x] Host tests verify `UPLOAD=0` skips heartbeat/upload while preserving NTP and weather polling.
 - [x] Feedback callback paths and full STM32 firmware compile with LED/MIDI buzzer integration.
 - [x] Protocol and Python tests cover `CFG:` config command construction, persistence and runtime apply callback paths.
 - [x] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.

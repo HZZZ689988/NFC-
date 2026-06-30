@@ -103,6 +103,9 @@ static void test_network_poll_is_disabled_when_upload_disabled(void)
     attendance_app_poll_network();
 
     require_int(g_network_init_calls == 1u, "network config init may still run");
+    require_int(g_time_sync_calls == 1u, "disabled upload should still sync time");
+    require_int(g_weather_calls == 1u, "disabled upload should still query weather");
+    require_int(g_weather_save_calls == 1u, "disabled upload should still cache weather");
     require_int(g_heartbeat_calls == 0u, "disabled upload should skip heartbeat");
     require_int(g_upload_calls == 0u, "disabled upload should skip upload");
 }

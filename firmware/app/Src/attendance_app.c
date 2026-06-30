@@ -338,11 +338,6 @@ void attendance_app_poll_serial(void)
 void attendance_app_poll_network(void)
 {
 #if ATT_ENABLE_NETWORK
-    if (!s_config.upload_enable) {
-        set_network_state(ATT_DISPLAY_NET_OFF);
-        return;
-    }
-
     if (s_network_ready == 0u) {
         set_network_state(ATT_DISPLAY_NET_ERROR);
         return;
@@ -375,6 +370,11 @@ void attendance_app_poll_network(void)
             set_network_state(ATT_DISPLAY_NET_ERROR);
         }
     }
+
+    if (!s_config.upload_enable) {
+        return;
+    }
+
     if (s_network_heartbeat_due ||
         (uint32_t)(now - s_last_network_heartbeat_time) >= ATT_NETWORK_HEARTBEAT_INTERVAL_SEC) {
         (void)att_network_send_heartbeat();

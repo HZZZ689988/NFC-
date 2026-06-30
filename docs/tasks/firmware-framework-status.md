@@ -40,6 +40,7 @@ updated: 2026-06-30
 - RTC initialization now preserves an already-marked RTC instead of resetting date/time on every boot.
 - `attendance_app_poll_network()` schedules heartbeat every 60 seconds and pending-upload attempts every 10 seconds when upload is enabled.
 - `attendance_app_poll_network()` schedules weather query/cache every 1800 seconds and NTP status checks every 3600 seconds, while avoiding raw NTP AT commands once ESP01S is in transparent TCP mode.
+- When `UPLOAD=0`, `attendance_app_poll_network()` still runs NTP and weather polling but skips heartbeat and pending-record upload attempts.
 - ESP01S transparent TCP data is dispatched through a FreeRTOS queue to `att_network_handle_rx()`, which marks records uploaded only after parsing `ACK:UPLOAD:<seq>`.
 - Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing and network polling schedule.
 - `att_card_issue_checked()` writes UID, SID, points, card type and CRC16 to Mifare sector 0 block 1.

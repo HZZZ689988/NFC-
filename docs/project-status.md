@@ -32,6 +32,7 @@ The project is in full-feature firmware integration and host-verification mode. 
 - Firmware now stores latest weather text in LittleFS `/weather.txt` and reloads it into the OLED display model at app startup.
 - Firmware feedback events now route attendance/network results to a FreeRTOS queue; L1/L2/L3/L4/L5 and TIM3_CH1 buzzer patterns indicate OK, invalid card, duplicate, fault and network-online states.
 - The upper-computer now has a device config tab that sends segmented `CFG:` commands for device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone; firmware saves those fields into `/config.bin` and reapplies display/network runtime state.
+- `UPLOAD=0` disables heartbeat and pending-record upload attempts while keeping NTP time sync and weather cache/display polling active when the ESP01S network path is ready.
 
 ## Verified On Host
 
