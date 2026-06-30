@@ -22,12 +22,12 @@ Files:
 ```text
 /config.bin       Device config, versioned and CRC16 protected
 /records.bin      Fixed-size attendance records, append first
+/weather.txt      Cached weather display data
 ```
 
 Future files:
 
 ```text
-/weather.txt      Cached weather display data
 /net_state.bin    Upload retry metadata if records.bin rewrite cost becomes high
 ```
 

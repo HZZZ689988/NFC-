@@ -21,6 +21,7 @@
 #include "rtc.h"
 
 /* USER CODE BEGIN 0 */
+#include "bsp_rtc.h"
 
 /* USER CODE END 0 */
 
@@ -57,11 +58,14 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
+  uint8_t rtc_first_power_on = BSP_RTC_IsFirstPowerOn();
 
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date
   */
+  if (rtc_first_power_on != 0u)
+  {
   sTime.Hours = 0x0;
   sTime.Minutes = 0x0;
   sTime.Seconds = 0x0;
@@ -79,6 +83,8 @@ void MX_RTC_Init(void)
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
   {
     Error_Handler();
+  }
+  BSP_RTC_MarkInitialized();
   }
 
   /** Enable the Alarm A

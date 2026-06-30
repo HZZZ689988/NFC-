@@ -48,6 +48,7 @@ C_SOURCES =  \
 ../Bsp/OLED/ssd1306_i2c.c \
 ../Bsp/OLED/GUISlim.c \
 ../Bsp/OLED/F08_ASCII.c \
+../Bsp/RTC/bsp_rtc.c \
 ../../app/Src/attendance_app.c \
 ../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
@@ -185,6 +186,7 @@ AS_INCLUDES =  \
 -I../Bsp/delay \
 -I../Bsp/ESP01 \
 -I../Bsp/OLED \
+-I../Bsp/RTC \
 -I../../app/Inc \
 -I../../third_party/littlefs
 
@@ -206,6 +208,7 @@ C_INCLUDES =  \
 -I../Bsp/delay \
 -I../Bsp/ESP01 \
 -I../Bsp/OLED \
+-I../Bsp/RTC \
 -I../../app/Inc \
 -I../../third_party/littlefs
 

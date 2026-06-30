@@ -14,10 +14,21 @@ typedef struct {
 
 typedef void (*ESP01S_DataCallback_t)(const uint8_t *pData, uint16_t len, void *pUserCtx);
 
+typedef enum {
+    ESP01S_STATE_IDLE = 0,
+    ESP01S_STATE_AT_OK,
+    ESP01S_STATE_WIFI_CONNECTING,
+    ESP01S_STATE_WIFI_CONNECTED,
+    ESP01S_STATE_TCP_CONNECTING,
+    ESP01S_STATE_TCP_CONNECTED,
+    ESP01S_STATE_TRANSPARENT,
+} ESP01S_State_t;
+
 void ESP01S_SetConfig(const ESP01S_Config_t *pConfig);
 void ESP01S_SendStr(const char *str);
 void ESP01S_RegisterDataCb(ESP01S_DataCallback_t pCb, void *pUserCtx);
 void ESP01S_SyncNtpTime(void);
+ESP01S_State_t ESP01S_GetState(void);
 uint8_t ESP01S_IsNtpSynced(void);
 int ESP01S_QueryWeather(const char *apiKey, const char *location,
                         const char *language, const char *unit,

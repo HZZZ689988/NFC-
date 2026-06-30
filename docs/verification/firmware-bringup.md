@@ -21,6 +21,7 @@ updated: 2026-06-30
 - [x] Add card account read path and serial record streaming path to linked firmware.
 - [x] Add image-card block command handling and same-UID image update session tracking to linked firmware.
 - [x] Add OLED BSP, `att_display` and FreeRTOS display task to linked firmware.
+- [x] Add RTC BSP, NTP-to-RTC write path and `/weather.txt` weather cache path to linked firmware.
 
 ## Host Verification
 
@@ -39,6 +40,7 @@ updated: 2026-06-30
 - [x] Python serial-client tests cover `UID:` and `OK:*` transaction terminators.
 - [x] `att_display.c` and `attendance_app.c` compile as ARM Cortex-M4 objects with display calls linked.
 - [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
+- [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
 - [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 - [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 - [ ] Clean or suppress inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings after functional bring-up.
@@ -62,8 +64,10 @@ updated: 2026-06-30
 - [ ] USART1 `LIST:N` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
 - [ ] ESP01S connects WiFi.
 - [ ] NTP sync updates RTC.
+- [ ] RTC keeps valid time across reset/VBAT conditions and attendance timestamps use RTC Unix seconds.
 - [ ] TCP upload reaches `server/server.py`.
 - [ ] Heartbeat reaches `server/server.py`.
 - [ ] OLED initializes on I2C1 and displays standby page.
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real card events.
 - [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.
+- [ ] LittleFS `/weather.txt` is created/updated after successful weather query and reloaded on reboot.

@@ -10,6 +10,7 @@
 #define ATT_CFG_VERSION     1u
 #define ATT_CFG_PATH        "config.bin"
 #define ATT_RECORD_PATH     "records.bin"
+#define ATT_WEATHER_PATH    "weather.txt"
 
 typedef struct {
     uint32_t magic;
@@ -278,4 +279,51 @@ att_status_t att_storage_mark_uploaded(uint32_t seq)
 
     (void)lfs_file_close(&s_lfs, &file);
     return ATT_ERR_NOT_READY;
+}
+
+att_status_t att_storage_load_weather(char *text, size_t text_len)
+{
+    if (text == NULL || text_len == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    text[0] = '\0';
+    if (ensure_mounted() != ATT_OK) {
+        return ATT_ERR_NOT_READY;
+    }
+
+    lfs_file_t file;
+    if (lfs_file_open(&s_lfs, &file, ATT_WEATHER_PATH, LFS_O_RDONLY) != 0) {
+        return ATT_ERR_STORAGE;
+    }
+
+    lfs_ssize_t read_len = lfs_file_read(&s_lfs, &file, text, text_len - 1u);
+    (void)lfs_file_close(&s_lfs, &file);
+    if (read_len < 0) {
+        text[0] = '\0';
+        return ATT_ERR_STORAGE;
+    }
+
+    text[(size_t)read_len] = '\0';
+    return ATT_OK;
+}
+
+att_status_t att_storage_save_weather(const char *text)
+{
+    if (text == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    if (ensure_mounted() != ATT_OK) {
+        return ATT_ERR_NOT_READY;
+    }
+
+    lfs_file_t file;
+    if (lfs_file_open(&s_lfs, &file, ATT_WEATHER_PATH, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) != 0) {
+        return ATT_ERR_STORAGE;
+    }
+
+    size_t len = strlen(text);
+    lfs_ssize_t written = lfs_file_write(&s_lfs, &file, text, len);
+    int close_err = lfs_file_close(&s_lfs, &file);
+
+    return (written == (lfs_ssize_t)len && close_err == 0) ? ATT_OK : ATT_ERR_STORAGE;
 }

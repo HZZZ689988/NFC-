@@ -22,6 +22,7 @@ void attendance_app_dispatch_serial_bytes(const uint8_t *data, size_t len);
 void attendance_app_poll_nfc(void);
 void attendance_app_poll_serial(void);
 void attendance_app_poll_network(void);
+void attendance_app_mark_network_ready(void);
 
 #ifdef __cplusplus
 }

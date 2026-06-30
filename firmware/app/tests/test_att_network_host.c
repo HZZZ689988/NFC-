@@ -199,3 +199,8 @@ att_status_t att_storage_mark_uploaded(uint32_t seq)
     g_mark_uploaded_calls++;
     return ATT_OK;
 }
+
+ESP01S_State_t ESP01S_GetState(void)
+{
+    return ESP01S_STATE_TRANSPARENT;
+}

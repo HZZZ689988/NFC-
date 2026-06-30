@@ -18,6 +18,9 @@
 
 #define ATT_NETWORK_UPLOAD_INTERVAL_SEC     10u
 #define ATT_NETWORK_HEARTBEAT_INTERVAL_SEC  60u
+#define ATT_NETWORK_TIME_SYNC_INTERVAL_SEC  3600u
+#define ATT_NETWORK_WEATHER_INTERVAL_SEC    1800u
+#define ATT_WEATHER_TEXT_LEN                32u
 
 static att_device_config_t s_config;
 static uint32_t s_next_seq = 1u;
@@ -33,8 +36,12 @@ static uint32_t s_last_uid_time;
 static uint8_t s_last_uid_valid;
 static uint32_t s_last_network_upload_time;
 static uint32_t s_last_network_heartbeat_time;
+static uint32_t s_last_network_time_sync_time;
+static uint32_t s_last_weather_time;
 static uint8_t s_network_upload_due;
 static uint8_t s_network_heartbeat_due;
+static uint8_t s_network_time_sync_due;
+static uint8_t s_weather_due;
 static uint8_t s_network_ready;
 
 static void default_serial_send(const char *line, void *ctx)
@@ -113,6 +120,10 @@ att_status_t attendance_app_init(void)
 
     att_display_set_config(&s_config);
     att_display_set_record_count(count);
+    char weather[ATT_WEATHER_TEXT_LEN];
+    if (att_storage_load_weather(weather, sizeof(weather)) == ATT_OK && weather[0] != '\0') {
+        att_display_set_weather(weather);
+    }
 
     (void)att_card_init();
 #if ATT_ENABLE_NETWORK
@@ -131,8 +142,12 @@ att_status_t attendance_app_init(void)
     s_last_uid_time = 0u;
     s_last_network_upload_time = 0u;
     s_last_network_heartbeat_time = 0u;
+    s_last_network_time_sync_time = 0u;
+    s_last_weather_time = 0u;
     s_network_upload_due = 1u;
     s_network_heartbeat_due = 1u;
+    s_network_time_sync_due = 1u;
+    s_weather_due = 1u;
     memset(&s_last_uid, 0, sizeof(s_last_uid));
     return ATT_OK;
 }
@@ -265,6 +280,32 @@ void attendance_app_poll_network(void)
     }
 
     uint32_t now = app_now();
+    if (s_network_time_sync_due ||
+        (uint32_t)(now - s_last_network_time_sync_time) >= ATT_NETWORK_TIME_SYNC_INTERVAL_SEC) {
+        att_status_t time_status = att_network_sync_time();
+        s_last_network_time_sync_time = now;
+        s_network_time_sync_due = 0u;
+        att_display_set_network(time_status == ATT_OK ?
+                                ATT_DISPLAY_NET_ONLINE :
+                                ATT_DISPLAY_NET_ERROR);
+    }
+
+    if (s_weather_due ||
+        (uint32_t)(now - s_last_weather_time) >= ATT_NETWORK_WEATHER_INTERVAL_SEC) {
+        char weather[ATT_WEATHER_TEXT_LEN];
+        att_status_t weather_status = att_network_query_weather(weather, sizeof(weather));
+        s_last_weather_time = now;
+        s_weather_due = 0u;
+        if (weather_status == ATT_OK && weather[0] != '\0') {
+            att_display_set_weather(weather);
+            (void)att_storage_save_weather(weather);
+            att_display_set_network(ATT_DISPLAY_NET_ONLINE);
+        } else if (weather_status == ATT_ERR_NOT_READY) {
+            att_display_set_network(ATT_DISPLAY_NET_ONLINE);
+        } else {
+            att_display_set_network(ATT_DISPLAY_NET_ERROR);
+        }
+    }
     if (s_network_heartbeat_due ||
         (uint32_t)(now - s_last_network_heartbeat_time) >= ATT_NETWORK_HEARTBEAT_INTERVAL_SEC) {
         (void)att_network_send_heartbeat();
@@ -282,5 +323,17 @@ void attendance_app_poll_network(void)
                                 ATT_DISPLAY_NET_UPLOAD :
                                 ATT_DISPLAY_NET_ONLINE);
     }
+#endif
+}
+
+void attendance_app_mark_network_ready(void)
+{
+#if ATT_ENABLE_NETWORK
+    s_network_ready = 1u;
+    s_network_upload_due = 1u;
+    s_network_heartbeat_due = 1u;
+    s_network_time_sync_due = 1u;
+    s_weather_due = 1u;
+    att_display_set_network(ATT_DISPLAY_NET_ONLINE);
 #endif
 }

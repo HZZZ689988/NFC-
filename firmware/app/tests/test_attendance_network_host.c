@@ -13,6 +13,9 @@ static uint32_t g_now_sec;
 static unsigned g_network_init_calls;
 static unsigned g_upload_calls;
 static unsigned g_heartbeat_calls;
+static unsigned g_time_sync_calls;
+static unsigned g_weather_calls;
+static unsigned g_weather_save_calls;
 static unsigned g_mark_uploaded_calls;
 static att_status_t g_network_init_status;
 
@@ -45,6 +48,9 @@ static void reset_mocks(void)
     g_network_init_calls = 0u;
     g_upload_calls = 0u;
     g_heartbeat_calls = 0u;
+    g_time_sync_calls = 0u;
+    g_weather_calls = 0u;
+    g_weather_save_calls = 0u;
     g_mark_uploaded_calls = 0u;
     g_network_init_status = ATT_OK;
 }
@@ -63,6 +69,9 @@ static void test_network_poll_schedules_heartbeat_and_upload(void)
 
     attendance_app_poll_network();
     require_int(g_network_init_calls == 1u, "network should initialize from loaded config");
+    require_int(g_time_sync_calls == 1u, "first network poll should sync time");
+    require_int(g_weather_calls == 1u, "first network poll should query weather");
+    require_int(g_weather_save_calls == 1u, "weather query should cache text");
     require_int(g_heartbeat_calls == 1u, "first network poll should send heartbeat");
     require_int(g_upload_calls == 1u, "first network poll should attempt pending upload");
     require_int(g_mark_uploaded_calls == 0u, "upload should stay pending without ACK parsing");
@@ -70,6 +79,8 @@ static void test_network_poll_schedules_heartbeat_and_upload(void)
     attendance_app_poll_network();
     require_int(g_heartbeat_calls == 1u, "heartbeat should not repeat before interval");
     require_int(g_upload_calls == 1u, "upload should not repeat before interval");
+    require_int(g_time_sync_calls == 1u, "time sync should not repeat before interval");
+    require_int(g_weather_calls == 1u, "weather should not repeat before interval");
 
     g_now_sec += 10u;
     attendance_app_poll_network();
@@ -238,6 +249,24 @@ att_status_t att_storage_next_pending_upload(att_record_t *record)
     return ATT_OK;
 }
 
+att_status_t att_storage_load_weather(char *text, size_t text_len)
+{
+    if (text == NULL || text_len == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    text[0] = '\0';
+    return ATT_ERR_STORAGE;
+}
+
+att_status_t att_storage_save_weather(const char *text)
+{
+    if (text == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    g_weather_save_calls++;
+    return ATT_OK;
+}
+
 att_status_t att_network_init(const att_device_config_t *config)
 {
     if (config == NULL) {
@@ -249,11 +278,16 @@ att_status_t att_network_init(const att_device_config_t *config)
 
 att_status_t att_network_sync_time(void)
 {
+    g_time_sync_calls++;
     return ATT_OK;
 }
 
-att_status_t att_network_query_weather(void)
+att_status_t att_network_query_weather(char *text, size_t text_len)
 {
+    g_weather_calls++;
+    if (text != NULL && text_len > 0u) {
+        snprintf(text, text_len, "Hangzhou Sunny/20C");
+    }
     return ATT_OK;
 }
 

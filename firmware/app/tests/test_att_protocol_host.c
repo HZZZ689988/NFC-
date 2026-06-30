@@ -346,3 +346,17 @@ att_status_t att_storage_next_pending_upload(att_record_t *record)
 {
     return record == NULL ? ATT_ERR_INVALID_ARG : ATT_ERR_NOT_READY;
 }
+
+att_status_t att_storage_load_weather(char *text, size_t text_len)
+{
+    if (text == NULL || text_len == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    text[0] = '\0';
+    return ATT_ERR_STORAGE;
+}
+
+att_status_t att_storage_save_weather(const char *text)
+{
+    return text == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+}

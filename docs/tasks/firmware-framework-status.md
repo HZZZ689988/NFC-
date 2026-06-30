@@ -29,14 +29,17 @@ updated: 2026-06-30
 
 - STM32 base builds with `make`.
 - Application-layer C files compile as ARM Cortex-M4 objects with the STM32/BSP include paths.
-- STM32 base now links LittleFS, RC522 BSP/platform support, ESP01S BSP support, OLED BSP support and the local attendance app modules: `attendance_app`, `att_card`, `att_crc16`, `att_display`, `att_lfs_port`, `att_storage`, `att_protocol` and `att_network`.
+- STM32 base now links LittleFS, RC522 BSP/platform support, ESP01S BSP support, OLED BSP support, RTC BSP support and the local attendance app modules: `attendance_app`, `att_card`, `att_crc16`, `att_display`, `att_lfs_port`, `att_storage`, `att_protocol` and `att_network`.
 - The FreeRTOS LED demo task now initializes W25Q128, mounts/formats LittleFS through `att_storage_init`, loads `config.bin`, and prints the storage state over USART1.
 - `att_storage_init` is idempotent after a successful mount, so the task can re-run the bootstrap status path without remounting an already mounted filesystem.
 - The K3 key now prints a LittleFS storage status line with record count, device id and upload-enable state for board-side smoke testing.
 - The FreeRTOS startup path now calls `attendance_app_init()`, which initializes storage and RC522 app support before reporting readiness over USART1.
 - The FreeRTOS runtime now creates USART1 serial, NFC polling, ESP01S network and OLED display tasks.
 - ESP01S uses USART6, is initialized before `attendance_app_init()` writes stored config into the network layer, and starts WiFi/TCP in its own low-priority task so local attendance is not blocked.
+- ESP01S startup NTP result is written into STM32 RTC after network start; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
+- RTC initialization now preserves an already-marked RTC instead of resetting date/time on every boot.
 - `attendance_app_poll_network()` schedules heartbeat every 60 seconds and pending-upload attempts every 10 seconds when upload is enabled.
+- `attendance_app_poll_network()` schedules weather query/cache every 1800 seconds and NTP status checks every 3600 seconds, while avoiding raw NTP AT commands once ESP01S is in transparent TCP mode.
 - ESP01S transparent TCP data is dispatched through a FreeRTOS queue to `att_network_handle_rx()`, which marks records uploaded only after parsing `ACK:UPLOAD:<seq>`.
 - Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing and network polling schedule.
 - `att_card_issue_checked()` writes UID, SID, points, card type and CRC16 to Mifare sector 0 block 1.
@@ -47,6 +50,7 @@ updated: 2026-06-30
 - Local NFC polling appends attendance records with the card account SID and rejects CRC/UID-invalid cards without appending records.
 - `LIST:N` and `LIST:ALL` stream attendance records over serial as `REC:` lines after `LIST:COUNT`.
 - `att_display` keeps a compact OLED status model for device ID, record count, upload enable state, network state and weather text.
+- `att_storage` persists latest weather text in `/weather.txt`; app init reloads it into the OLED model before the next online query.
 - Local NFC polling now pushes attendance OK, duplicate, invalid-card and storage/card-error events to the display model.
 - The FreeRTOS display task initializes the OLED GUI/BSP and refreshes standby, attendance-result, network-state and weather-placeholder pages.
 
@@ -56,7 +60,8 @@ updated: 2026-06-30
 - Card account block read/write and CRC invalid-card handling are implemented but not real-board validated.
 - Image-card Mifare block writes and `UPDATEIMG` completeness checking are implemented but not real-board validated.
 - `LIST:N` / `LIST:ALL` record streaming is build-checked but not validated through USART1 against real board storage.
-- ESP01S WiFi, TCP, NTP, weather, heartbeat and upload paths are build-linked/scheduled but not real-board validated.
+- ESP01S WiFi, TCP, NTP-to-RTC, weather query/cache, heartbeat and upload paths are build-linked/scheduled but not real-board validated.
+- RTC time retention and RTC-derived attendance timestamps are implemented but not real-board validated.
 - OLED GUI/BSP and display task are build-linked but not real-board validated on I2C1 PB6/PB7.
 - Upload ACK parsing and `att_storage_mark_uploaded()` integration are host-tested but not real-board validated.
 - Native C host test executables were not run on 2026-06-30 because `gcc`, `clang`, `cl` and `zig` are not installed in the current environment; ARM GCC compile-only checks were used instead.

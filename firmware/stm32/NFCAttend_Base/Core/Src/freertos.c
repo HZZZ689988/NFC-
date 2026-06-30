@@ -34,7 +34,9 @@
 #include "att_display.h"
 #include "att_network.h"
 #include "att_storage.h"
+#include "bsp_rtc.h"
 #include "esp01s.h"
+#include "rtc.h"
 #include "usart.h"
 /* USER CODE END Includes */
 
@@ -150,6 +152,7 @@ static void AttendanceApp_Bootstrap(void);
 static void AttendanceNetwork_InitDriver(void);
 static void AttendanceSerial_Send(const char *line, void *ctx);
 static uint32_t AttendanceTime_Now(void *ctx);
+static uint32_t AttendanceTime_DateTimeToUnix(const BSP_RTC_DateTime_t *dt);
 static void AttendanceStorage_Bootstrap(void);
 static void AttendanceStorage_PrintStatus(void);
 /* USER CODE END FunctionPrototypes */
@@ -269,7 +272,44 @@ static void AttendanceSerial_Send(const char *line, void *ctx)
 static uint32_t AttendanceTime_Now(void *ctx)
 {
   (void)ctx;
+  BSP_RTC_DateTime_t dt;
+  if (BSP_RTC_GetDateTime(&dt) == HAL_OK && dt.year > 2020u)
+  {
+    return AttendanceTime_DateTimeToUnix(&dt);
+  }
+
   return (uint32_t)(osKernelGetTickCount() / 1000u);
+}
+
+static uint32_t AttendanceTime_DateTimeToUnix(const BSP_RTC_DateTime_t *dt)
+{
+  static const uint16_t daysBeforeMonth[12] = {
+      0u, 31u, 59u, 90u, 120u, 151u, 181u, 212u, 243u, 273u, 304u, 334u
+  };
+  uint32_t days = 0u;
+  uint16_t year;
+
+  if (dt == NULL || dt->year < 1970u || dt->month == 0u || dt->month > 12u || dt->day == 0u)
+  {
+    return 0u;
+  }
+
+  for (year = 1970u; year < dt->year; ++year)
+  {
+    days += BSP_RTC_IsLeapYear(year) ? 366u : 365u;
+  }
+
+  days += daysBeforeMonth[dt->month - 1u];
+  if (dt->month > 2u && BSP_RTC_IsLeapYear(dt->year))
+  {
+    days += 1u;
+  }
+  days += (uint32_t)(dt->day - 1u);
+
+  return days * 86400u +
+         (uint32_t)dt->hour * 3600u +
+         (uint32_t)dt->minute * 60u +
+         (uint32_t)dt->second;
 }
 
 static void AttendanceStorage_Bootstrap(void)
@@ -469,6 +509,12 @@ void StartNetworkTask(void *argument)
     int start_status = ESP01S_Start();
     if (start_status == 0)
     {
+      attendance_app_mark_network_ready();
+      if (ESP01S_SetRtcFromNtp(&hrtc) == 0)
+      {
+        BSP_RTC_MarkInitialized();
+        printf("RTC synced from ESP01S NTP\r\n");
+      }
       att_display_set_network(ATT_DISPLAY_NET_ONLINE);
       printf("ESP01S network ready\r\n");
       break;

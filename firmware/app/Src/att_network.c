@@ -115,28 +115,41 @@ att_status_t att_network_sync_time(void)
     if (!s_configured) {
         return ATT_ERR_NOT_READY;
     }
-    ESP01S_SyncNtpTime();
+
+    if (ESP01S_GetState() != ESP01S_STATE_TRANSPARENT) {
+        ESP01S_SyncNtpTime();
+    }
     return ESP01S_IsNtpSynced() ? ATT_OK : ATT_ERR;
 }
 
-att_status_t att_network_query_weather(void)
+att_status_t att_network_query_weather(char *text, size_t text_len)
 {
+    if (text == NULL || text_len == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    text[0] = '\0';
+
     if (!s_configured || s_config.weather_key[0] == '\0' || s_config.weather_location[0] == '\0') {
         return ATT_ERR_NOT_READY;
     }
 
-    char city[16];
-    char day[32];
-    char high[8];
-    char night[32];
-    char low[8];
-    char precip[8];
+    char city[16] = {0};
+    char day[32] = {0};
+    char high[8] = {0};
+    char night[32] = {0};
+    char low[8] = {0};
+    char precip[8] = {0};
     int ret = ESP01S_QueryWeather(s_config.weather_key, s_config.weather_location,
-                                  "zh-Hans", "c", city, sizeof(city),
+                                  "en", "c", city, sizeof(city),
                                   day, sizeof(day), high, sizeof(high),
                                   night, sizeof(night), low, sizeof(low),
                                   precip, sizeof(precip));
-    return ret == 0 ? ATT_OK : ATT_ERR;
+    if (ret != 0) {
+        return ATT_ERR;
+    }
+
+    snprintf(text, text_len, "%s %s/%sC", city[0] ? city : s_config.weather_location, day, low);
+    return ATT_OK;
 }
 
 att_status_t att_network_upload_pending(void)

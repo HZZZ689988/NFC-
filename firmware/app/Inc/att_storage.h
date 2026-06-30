@@ -23,6 +23,8 @@ att_status_t att_storage_record_count(uint32_t *count);
 att_status_t att_storage_mark_uploaded(uint32_t seq);
 
 att_status_t att_storage_next_pending_upload(att_record_t *record);
+att_status_t att_storage_load_weather(char *text, size_t text_len);
+att_status_t att_storage_save_weather(const char *text);
 
 #ifdef __cplusplus
 }
