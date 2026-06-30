@@ -44,9 +44,14 @@ C_SOURCES =  \
 ../Bsp/NFC/rc522_platform_stm32.c \
 ../Bsp/delay/delay_us.c \
 ../Bsp/ESP01/esp01s.c \
+../Bsp/OLED/ssd1306.c \
+../Bsp/OLED/ssd1306_i2c.c \
+../Bsp/OLED/GUISlim.c \
+../Bsp/OLED/F08_ASCII.c \
 ../../app/Src/attendance_app.c \
 ../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
+../../app/Src/att_display.c \
 ../../app/Src/att_lfs_port.c \
 ../../app/Src/att_network.c \
 ../../app/Src/att_protocol.c \
@@ -158,7 +163,8 @@ AS_DEFS =
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
 -DSTM32F407xx \
--DATT_ENABLE_NETWORK=1
+-DATT_ENABLE_NETWORK=1 \
+-DATT_ENABLE_DISPLAY=1
 
 
 # AS includes
@@ -178,6 +184,7 @@ AS_INCLUDES =  \
 -I../Bsp/UartDrv \
 -I../Bsp/delay \
 -I../Bsp/ESP01 \
+-I../Bsp/OLED \
 -I../../app/Inc \
 -I../../third_party/littlefs
 
@@ -198,6 +205,7 @@ C_INCLUDES =  \
 -I../Bsp/UartDrv \
 -I../Bsp/delay \
 -I../Bsp/ESP01 \
+-I../Bsp/OLED \
 -I../../app/Inc \
 -I../../third_party/littlefs
 

@@ -3,6 +3,7 @@
 C_SOURCES += \
 ../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
+../../app/Src/att_display.c \
 ../../app/Src/att_lfs_port.c \
 ../../app/Src/att_network.c \
 ../../app/Src/att_protocol.c \
@@ -15,4 +16,5 @@ C_INCLUDES += \
 -I../../app/Inc \
 -I../../third_party/littlefs \
 -I../Bsp/NFC \
--I../Bsp/ESP01
+-I../Bsp/ESP01 \
+-I../Bsp/OLED

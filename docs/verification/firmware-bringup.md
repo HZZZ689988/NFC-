@@ -20,6 +20,7 @@ updated: 2026-06-30
 - [x] Enable `ATT_ENABLE_NETWORK` in the STM32 Makefile and build the network task path.
 - [x] Add card account read path and serial record streaming path to linked firmware.
 - [x] Add image-card block command handling and same-UID image update session tracking to linked firmware.
+- [x] Add OLED BSP, `att_display` and FreeRTOS display task to linked firmware.
 
 ## Host Verification
 
@@ -36,8 +37,11 @@ updated: 2026-06-30
 - [x] `LIST:N` logic has compile-checked tests for streaming newest records and rejecting invalid list counts before sending partial list output.
 - [x] `IMGAxx`, `IMGNxx`, `IMGDxx` and `UPDATEIMG` protocol routing has compile-checked tests.
 - [x] Python serial-client tests cover `UID:` and `OK:*` transaction terminators.
+- [x] `att_display.c` and `attendance_app.c` compile as ARM Cortex-M4 objects with display calls linked.
+- [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
 - [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 - [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
+- [ ] Clean or suppress inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings after functional bring-up.
 
 ## Hardware
 
@@ -60,3 +64,6 @@ updated: 2026-06-30
 - [ ] NTP sync updates RTC.
 - [ ] TCP upload reaches `server/server.py`.
 - [ ] Heartbeat reaches `server/server.py`.
+- [ ] OLED initializes on I2C1 and displays standby page.
+- [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real card events.
+- [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.

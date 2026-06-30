@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "att_card.h"
+#include "att_display.h"
 #include "att_protocol.h"
 #include "att_storage.h"
 
@@ -82,6 +83,16 @@ static uint8_t is_duplicate_uid(const att_uid_t *uid, uint32_t now)
     return (uint8_t)((uint32_t)(now - s_last_uid_time) < (uint32_t)s_config.repeat_interval_sec);
 }
 
+static uint32_t app_now(void)
+{
+    if (s_time_now == NULL) {
+        s_time_now = default_time_now;
+        s_time_ctx = NULL;
+    }
+
+    return s_time_now(s_time_ctx);
+}
+
 att_status_t attendance_app_init(void)
 {
     att_status_t status = att_storage_init();
@@ -100,12 +111,16 @@ att_status_t attendance_app_init(void)
         s_next_seq = count + 1u;
     }
 
+    att_display_set_config(&s_config);
+    att_display_set_record_count(count);
+
     (void)att_card_init();
 #if ATT_ENABLE_NETWORK
     s_network_ready = (att_network_init(&s_config) == ATT_OK) ? 1u : 0u;
 #else
     s_network_ready = 0u;
 #endif
+    att_display_set_network(s_network_ready ? ATT_DISPLAY_NET_READY : ATT_DISPLAY_NET_OFF);
     s_serial_send = default_serial_send;
     s_serial_send_ctx = NULL;
     s_time_now = default_time_now;
@@ -187,21 +202,19 @@ void attendance_app_poll_nfc(void)
     }
     if (status == ATT_ERR_CRC || status == ATT_ERR_CID_MISMATCH) {
         send_line("ATTEND:ERR:INVALID_CARD\n");
+        att_display_show_attendance_invalid(app_now());
         return;
     }
     if (status != ATT_OK) {
         send_line("ATTEND:ERR:CARD\n");
+        att_display_show_error("CARD READ", app_now());
         return;
     }
 
-    if (s_time_now == NULL) {
-        s_time_now = default_time_now;
-        s_time_ctx = NULL;
-    }
-
-    uint32_t now = s_time_now(s_time_ctx);
+    uint32_t now = app_now();
     if (is_duplicate_uid(&person.uid, now)) {
         send_line("ATTEND:SKIP:DUPLICATE\n");
+        att_display_show_attendance_duplicate(now);
         return;
     }
 
@@ -218,6 +231,7 @@ void attendance_app_poll_nfc(void)
     status = att_storage_append_record(&record);
     if (status != ATT_OK) {
         send_line("ATTEND:ERR:STORAGE\n");
+        att_display_show_error("STORAGE", now);
         return;
     }
 
@@ -229,6 +243,7 @@ void attendance_app_poll_nfc(void)
     char line[32];
     snprintf(line, sizeof(line), "ATTEND:OK:SEQ=%lu\n", (unsigned long)record.seq);
     send_line(line);
+    att_display_show_attendance_ok(record.seq, record.sid, now);
 }
 
 void attendance_app_poll_serial(void)
@@ -239,28 +254,33 @@ void attendance_app_poll_serial(void)
 void attendance_app_poll_network(void)
 {
 #if ATT_ENABLE_NETWORK
-    if (!s_config.upload_enable || s_network_ready == 0u) {
+    if (!s_config.upload_enable) {
+        att_display_set_network(ATT_DISPLAY_NET_OFF);
         return;
     }
 
-    if (s_time_now == NULL) {
-        s_time_now = default_time_now;
-        s_time_ctx = NULL;
+    if (s_network_ready == 0u) {
+        att_display_set_network(ATT_DISPLAY_NET_ERROR);
+        return;
     }
 
-    uint32_t now = s_time_now(s_time_ctx);
+    uint32_t now = app_now();
     if (s_network_heartbeat_due ||
         (uint32_t)(now - s_last_network_heartbeat_time) >= ATT_NETWORK_HEARTBEAT_INTERVAL_SEC) {
         (void)att_network_send_heartbeat();
         s_last_network_heartbeat_time = now;
         s_network_heartbeat_due = 0u;
+        att_display_set_network(ATT_DISPLAY_NET_ONLINE);
     }
 
     if (s_network_upload_due ||
         (uint32_t)(now - s_last_network_upload_time) >= ATT_NETWORK_UPLOAD_INTERVAL_SEC) {
-        (void)att_network_upload_pending();
+        att_status_t upload_status = att_network_upload_pending();
         s_last_network_upload_time = now;
         s_network_upload_due = 0u;
+        att_display_set_network(upload_status == ATT_OK ?
+                                ATT_DISPLAY_NET_UPLOAD :
+                                ATT_DISPLAY_NET_ONLINE);
     }
 #endif
 }

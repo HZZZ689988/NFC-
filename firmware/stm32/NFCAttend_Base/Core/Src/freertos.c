@@ -31,6 +31,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "attendance_app.h"
+#include "att_display.h"
 #include "att_network.h"
 #include "att_storage.h"
 #include "esp01s.h"
@@ -57,6 +58,7 @@
 #define ATT_NFC_POLL_INTERVAL_MS 500u
 #define ATT_NETWORK_START_RETRY_MS 30000u
 #define ATT_NETWORK_POLL_INTERVAL_MS 1000u
+#define ATT_DISPLAY_POLL_INTERVAL_MS 500u
 
 /* USER CODE END PD */
 
@@ -134,6 +136,14 @@ const osThreadAttr_t networkTask_attributes = {
   .priority = (osPriority_t) osPriorityLow,
 };
 
+/* Definitions for displayTask */
+osThreadId_t displayTaskHandle;
+const osThreadAttr_t displayTask_attributes = {
+  .name = "displayTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void AttendanceApp_Bootstrap(void);
@@ -148,6 +158,7 @@ void StartLedTask(void *argument);
 void StartSerialTask(void *argument);
 void StartNfcTask(void *argument);
 void StartNetworkTask(void *argument);
+void StartDisplayTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -195,6 +206,7 @@ void MX_FREERTOS_Init(void) {
   }
   nfcTaskHandle = osThreadNew(StartNfcTask, NULL, &nfcTask_attributes);
   networkTaskHandle = osThreadNew(StartNetworkTask, NULL, &networkTask_attributes);
+  displayTaskHandle = osThreadNew(StartDisplayTask, NULL, &displayTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -444,6 +456,8 @@ void StartNetworkTask(void *argument)
   /* USER CODE BEGIN StartNetworkTask */
   (void)argument;
 
+  att_display_set_network(ATT_DISPLAY_NET_STARTING);
+
   while (attendanceAppReady == 0u)
   {
     osDelay(100u);
@@ -455,10 +469,12 @@ void StartNetworkTask(void *argument)
     int start_status = ESP01S_Start();
     if (start_status == 0)
     {
+      att_display_set_network(ATT_DISPLAY_NET_ONLINE);
       printf("ESP01S network ready\r\n");
       break;
     }
 
+    att_display_set_network(ATT_DISPLAY_NET_ERROR);
     printf("ESP01S network start failed: %d\r\n", start_status);
     osDelay(ATT_NETWORK_START_RETRY_MS);
   }
@@ -477,6 +493,25 @@ void StartNetworkTask(void *argument)
     osDelay(ATT_NETWORK_POLL_INTERVAL_MS);
   }
   /* USER CODE END StartNetworkTask */
+}
+
+void StartDisplayTask(void *argument)
+{
+  /* USER CODE BEGIN StartDisplayTask */
+  (void)argument;
+
+  att_status_t status = att_display_init();
+  if (status != ATT_OK)
+  {
+    printf("OLED display init failed: %d\r\n", (int)status);
+  }
+
+  for (;;)
+  {
+    att_display_poll(AttendanceTime_Now(NULL));
+    osDelay(ATT_DISPLAY_POLL_INTERVAL_MS);
+  }
+  /* USER CODE END StartDisplayTask */
 }
 
 /* Private application code --------------------------------------------------*/
