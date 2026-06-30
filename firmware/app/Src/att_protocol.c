@@ -38,6 +38,23 @@ static int parse_uid_hex(const char *hex, att_uid_t *uid)
     return 0;
 }
 
+static int parse_hex_block16(const char *hex, uint8_t out[16])
+{
+    if (hex == NULL || out == NULL || strlen(hex) != 32u) {
+        return -1;
+    }
+
+    for (size_t i = 0; i < 16u; ++i) {
+        int hi = hex_to_nibble(hex[i * 2u]);
+        int lo = hex_to_nibble(hex[i * 2u + 1u]);
+        if (hi < 0 || lo < 0) {
+            return -1;
+        }
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return 0;
+}
+
 static void uid_to_hex(const att_uid_t *uid, char out[ATT_UID_HEX_LEN + 1u])
 {
     static const char hex[] = "0123456789ABCDEF";
@@ -76,6 +93,12 @@ static void send_card_status(att_status_t status, const char *ok_line,
         break;
     case ATT_ERR_INVALID_ARG:
         send("ERR:ARG\n", ctx);
+        break;
+    case ATT_ERR_CRC:
+        send("ERR:CRC\n", ctx);
+        break;
+    case ATT_ERR_NOT_READY:
+        send("ERR:NOT_READY\n", ctx);
         break;
     default:
         send("ERR:CARD\n", ctx);
@@ -216,6 +239,40 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
 
         att_status_t status = att_card_clear_checked(&uid);
         send_card_status(status, "OK:CLEAR\n", send, ctx);
+        return status;
+    }
+    if ((strncmp(payload, "IMGA", 4) == 0) ||
+        (strncmp(payload, "IMGN", 4) == 0) ||
+        (strncmp(payload, "IMGD", 4) == 0)) {
+        if (!isdigit((unsigned char)payload[4]) ||
+            !isdigit((unsigned char)payload[5]) ||
+            payload[6] != ':') {
+            send("ERR:ARG\n", ctx);
+            return ATT_ERR_INVALID_ARG;
+        }
+
+        att_card_image_area_t area = ATT_CARD_IMAGE_PORTRAIT;
+        if (payload[3] == 'N') {
+            area = ATT_CARD_IMAGE_NAME;
+        } else if (payload[3] == 'D') {
+            area = ATT_CARD_IMAGE_DEPARTMENT;
+        }
+
+        uint8_t index = (uint8_t)(((uint8_t)(payload[4] - '0') * 10u) + (uint8_t)(payload[5] - '0'));
+        uint8_t block[16];
+        if (parse_hex_block16(payload + 7, block) != 0) {
+            send("ERR:ARG\n", ctx);
+            return ATT_ERR_INVALID_ARG;
+        }
+
+        att_status_t status = att_card_write_image_block(area, index, block);
+        send_card_status(status, "OK:IMG\n", send, ctx);
+        return status;
+    }
+
+    if (strcmp(payload, "UPDATEIMG") == 0) {
+        att_status_t status = att_card_finish_image_update();
+        send_card_status(status, "OK:UPDATEIMG\n", send, ctx);
         return status;
     }
 

@@ -40,6 +40,9 @@ updated: 2026-06-30
 - Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing and network polling schedule.
 - `att_card_issue_checked()` writes UID, SID, points, card type and CRC16 to Mifare sector 0 block 1.
 - `att_card_read_person()` reads the same account block, verifies the physical UID against the stored UID and validates CRC16 before exposing person data.
+- `att_card_write_image_block()` maps `IMGAxx`, `IMGNxx` and `IMGDxx` to Mifare data blocks while skipping sector trailers, and requires the same image-card UID throughout an update session.
+- `att_card_finish_image_update()` accepts `UPDATEIMG` only after 24 portrait blocks, 10 name blocks and 10 department blocks have been received.
+- The upper-computer serial client accepts `UID:` and `OK:*` as transaction-complete lines and only auto-sends image blocks for image cards.
 - Local NFC polling appends attendance records with the card account SID and rejects CRC/UID-invalid cards without appending records.
 - `LIST:N` and `LIST:ALL` stream attendance records over serial as `REC:` lines after `LIST:COUNT`.
 
@@ -47,6 +50,7 @@ updated: 2026-06-30
 
 - RC522 UID read and card block read/write are build-linked but not real-board validated.
 - Card account block read/write and CRC invalid-card handling are implemented but not real-board validated.
+- Image-card Mifare block writes and `UPDATEIMG` completeness checking are implemented but not real-board validated.
 - `LIST:N` / `LIST:ALL` record streaming is build-checked but not validated through USART1 against real board storage.
 - ESP01S WiFi, TCP, NTP, weather, heartbeat and upload paths are build-linked/scheduled but not real-board validated.
 - Upload ACK parsing and `att_storage_mark_uploaded()` integration are host-tested but not real-board validated.

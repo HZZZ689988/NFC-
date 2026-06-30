@@ -133,7 +133,8 @@ def chunk_commands(prefix: str, blocks: Iterable[bytes]) -> list[str]:
 
 
 def is_success_response(line: str) -> bool:
-    return line.strip().upper() == "OK"
+    value = line.strip().upper()
+    return value == "OK" or value.startswith("OK:")
 
 
 def is_error_response(line: str) -> bool:

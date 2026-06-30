@@ -420,7 +420,10 @@ class AttendanceApp(tk.Tk):
             points=person.points,
             card_type=CardType(person.card_type),
         )
-        return [build_issue(payload), *self.build_image_commands(person.name, person.department)]
+        commands = [build_issue(payload)]
+        if CardType(person.card_type) == CardType.IMAGE:
+            commands.extend(self.build_image_commands(person.name, person.department))
+        return commands
 
     def build_image_commands(self, name: str, department: str) -> list[str]:
         threshold = self.threshold_var.get()

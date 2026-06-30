@@ -222,6 +222,18 @@ att_status_t att_card_clear_checked(const att_uid_t *expected_uid)
     return expected_uid == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
 }
 
+att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t index, const uint8_t data[16])
+{
+    (void)area;
+    (void)index;
+    return data == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+}
+
+att_status_t att_card_finish_image_update(void)
+{
+    return ATT_OK;
+}
+
 att_status_t att_storage_init(void)
 {
     return ATT_OK;

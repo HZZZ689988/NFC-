@@ -89,12 +89,13 @@ class FakeSerial:
         self.is_open = True
         self.writes: list[bytes] = []
         self.client = client
+        self.responses = ["UID:A1B2C3D4"]
 
     def write(self, data: bytes) -> None:
         self.writes.append(data)
         if self.client:
-            self.client._line_queue.put("UID:A1B2C3D4")  # type: ignore[attr-defined]
-            self.client._line_queue.put("OK")  # type: ignore[attr-defined]
+            for response in self.responses:
+                self.client._line_queue.put(response)  # type: ignore[attr-defined]
 
     def flush(self) -> None:
         pass
@@ -109,7 +110,26 @@ def test_serial_transact_drains_stale_lines() -> None:
     lines = client.transact("READ\n", timeout=0.2)
 
     assert fake.writes == [b"READ\n"]
-    assert lines == ["UID:A1B2C3D4", "OK"]
+    assert lines == ["UID:A1B2C3D4"]
+
+
+def test_serial_transact_accepts_ok_prefix() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    fake.responses = ["OK:ISSUE"]
+    client._serial = fake  # type: ignore[attr-defined]
+
+    lines = client.transact("ISSUE:A1B2C3D4,1001,0,1\n", timeout=0.2)
+
+    assert fake.writes == [b"ISSUE:A1B2C3D4,1001,0,1\n"]
+    assert lines == ["OK:ISSUE"]
+
+def test_success_response_accepts_ok_prefix() -> None:
+    from nfc_attendance_tool.protocol import is_success_response
+
+    assert is_success_response("OK")
+    assert is_success_response("OK:ISSUE")
+    assert not is_success_response("ERR:CARD")
 
 
 def test_server_ack_upload_sequence() -> None:

@@ -74,7 +74,13 @@ class SerialClient:
                     continue
                 lines.append(line)
                 stripped = line.strip().upper()
-                if stripped == "OK" or stripped.startswith("ERR:") or stripped == "LIST:END":
+                if (
+                    stripped == "OK"
+                    or stripped.startswith("OK:")
+                    or stripped.startswith("UID:")
+                    or stripped.startswith("ERR:")
+                    or stripped == "LIST:END"
+                ):
                     break
             return lines
 

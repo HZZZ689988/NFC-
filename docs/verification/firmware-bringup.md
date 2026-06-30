@@ -19,6 +19,7 @@ updated: 2026-06-30
 - [x] Add ESP01S network modules to linked firmware after UART6 task integration.
 - [x] Enable `ATT_ENABLE_NETWORK` in the STM32 Makefile and build the network task path.
 - [x] Add card account read path and serial record streaming path to linked firmware.
+- [x] Add image-card block command handling and same-UID image update session tracking to linked firmware.
 
 ## Host Verification
 
@@ -33,6 +34,8 @@ updated: 2026-06-30
 - [x] Resolve known W25QXX build warning: unused local variable `temp` in `W25QXX_Init`.
 - [x] ARM GCC compile-only checks pass for `test_att_protocol_host.c`, `test_attendance_serial_host.c`, `test_attendance_nfc_host.c`, `test_att_network_host.c` and `test_attendance_network_host.c`.
 - [x] `LIST:N` logic has compile-checked tests for streaming newest records and rejecting invalid list counts before sending partial list output.
+- [x] `IMGAxx`, `IMGNxx`, `IMGDxx` and `UPDATEIMG` protocol routing has compile-checked tests.
+- [x] Python serial-client tests cover `UID:` and `OK:*` transaction terminators.
 - [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 - [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 
@@ -48,6 +51,9 @@ updated: 2026-06-30
 - [ ] `ISSUE` writes matching card.
 - [ ] Issued card account block can be read back with matching UID, SID, points, card type and CRC16.
 - [ ] Invalid account block CRC is rejected without appending an attendance record.
+- [ ] `IMGA00..23`, `IMGN00..09`, `IMGD00..09` write to a real image card and `UPDATEIMG` returns success.
+- [ ] `UPDATEIMG` returns `ERR:NOT_READY` when any image block is missing.
+- [ ] Image-card block contents can be read back from RC522 and match upper-computer generated bitmap data.
 - [ ] USART1 responds to `PING` and `CFG?`.
 - [ ] USART1 `LIST:N` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
 - [ ] ESP01S connects WiFi.

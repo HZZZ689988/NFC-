@@ -26,6 +26,10 @@ Legacy newline commands are still accepted during bring-up.
 ```text
 READ
 ISSUE:UID,SID,POINTS,CARD_TYPE
+IMGA00:HEX32
+IMGN00:HEX32
+IMGD00:HEX32
+UPDATEIMG
 CLEAR:UID
 LIST:N
 LIST:ALL
@@ -39,16 +43,41 @@ Expected replies:
 UID:A1B2C3D4
 OK
 OK:ISSUE
+OK:IMG
+OK:UPDATEIMG
 OK:CLEAR
 ERR:NO_CARD
 ERR:UID_MISMATCH
 ERR:CRC
+ERR:NOT_READY
 LIST:COUNT=12
 REC:SEQ=12|UID=A1B2C3D4|SID=1001|NORMAL|1782691200|DEV=1|OK
 LIST:END
 ```
 
 `LIST:N` returns the newest `N` records. `LIST:ALL` returns every stored record in storage order. Bad list counts return `ERR:ARG` without sending a partial list.
+
+## Image Card Blocks
+
+Image card block commands write one 16-byte Mifare data block per command:
+
+```text
+IMGA00..IMGA23: portrait bitmap blocks
+IMGN00..IMGN09: name bitmap blocks
+IMGD00..IMGD09: department bitmap blocks
+UPDATEIMG: finish the image update session
+```
+
+The payload after `:` is exactly 32 uppercase or lowercase hex characters. Firmware writes only Mifare data blocks and skips every sector trailer block.
+
+Current block layout:
+
+- Account block: sector 0 block 1.
+- Portrait: sectors 1-8, blocks 0-2 in each sector, 24 blocks total.
+- Name: starts at sector 9 block 0 and uses the next 10 data blocks.
+- Department: starts after the name blocks and uses the next 10 data blocks.
+
+`UPDATEIMG` succeeds only after all 24 portrait blocks, 10 name blocks and 10 department blocks have been received for the same image card UID. Otherwise it returns `ERR:NOT_READY`.
 
 ## UID Forced Consistency
 

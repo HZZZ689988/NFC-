@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "att_card.h"
 #include "att_protocol.h"
 #include "att_storage.h"
 
@@ -19,6 +20,11 @@ static att_record_t g_records[3];
 static uint32_t g_record_count;
 static unsigned g_issue_calls;
 static unsigned g_clear_calls;
+static att_card_image_area_t g_last_image_area;
+static uint8_t g_last_image_index;
+static uint8_t g_last_image_block[16];
+static unsigned g_image_calls;
+static unsigned g_update_image_calls;
 
 static void capture_send(const char *line, void *ctx)
 {
@@ -49,6 +55,11 @@ static void reset_mocks(void)
     g_record_count = 0u;
     g_issue_calls = 0u;
     g_clear_calls = 0u;
+    g_last_image_area = ATT_CARD_IMAGE_PORTRAIT;
+    g_last_image_index = 0u;
+    memset(g_last_image_block, 0, sizeof(g_last_image_block));
+    g_image_calls = 0u;
+    g_update_image_calls = 0u;
 }
 
 static void test_read_returns_uid(void)
@@ -159,6 +170,34 @@ static void test_list_rejects_bad_count_before_storage_access(void)
                 "bad LIST count should only report argument error");
 }
 
+static void test_image_block_command_calls_card_writer(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("IMGN09:00112233445566778899AABBCCDDEEFF", capture_send, &capture);
+
+    require_int(status == ATT_OK, "image block should return ATT_OK");
+    require_int(strcmp(capture.text, "OK:IMG\n") == 0, "image block should acknowledge write");
+    require_int(g_image_calls == 1u, "image block should call card writer");
+    require_int(g_last_image_area == ATT_CARD_IMAGE_NAME, "image block should parse area");
+    require_int(g_last_image_index == 9u, "image block should parse index");
+    require_int(g_last_image_block[0] == 0x00 && g_last_image_block[15] == 0xFF,
+                "image block should parse hex payload");
+}
+
+static void test_update_image_calls_card_finish(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("UPDATEIMG", capture_send, &capture);
+
+    require_int(status == ATT_OK, "UPDATEIMG should return ATT_OK");
+    require_int(strcmp(capture.text, "OK:UPDATEIMG\n") == 0, "UPDATEIMG should acknowledge update");
+    require_int(g_update_image_calls == 1u, "UPDATEIMG should call card finish");
+}
+
 int main(void)
 {
     test_read_returns_uid();
@@ -168,6 +207,8 @@ int main(void)
     test_clear_calls_card_clear();
     test_list_streams_records();
     test_list_rejects_bad_count_before_storage_access();
+    test_image_block_command_calls_card_writer();
+    test_update_image_calls_card_finish();
     return 0;
 }
 
@@ -215,6 +256,24 @@ att_status_t att_card_clear_checked(const att_uid_t *expected_uid)
     g_last_clear_uid = *expected_uid;
     g_clear_calls++;
     return g_clear_status;
+}
+
+att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t index, const uint8_t data[16])
+{
+    if (data == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    g_last_image_area = area;
+    g_last_image_index = index;
+    memcpy(g_last_image_block, data, sizeof(g_last_image_block));
+    g_image_calls++;
+    return ATT_OK;
+}
+
+att_status_t att_card_finish_image_update(void)
+{
+    g_update_image_calls++;
+    return ATT_OK;
 }
 
 att_status_t att_storage_init(void)
