@@ -34,6 +34,11 @@ CLEAR:UID
 LIST:N
 LIST:ALL
 CFG?
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
+CFG:SSID=wifi-name
+CFG:PWD=wifi-password
+CFG:HOST=192.168.1.10|PORT=9000
+CFG:WKEY=weather-key|WLOC=hangzhou
 PING
 ```
 
@@ -53,9 +58,28 @@ ERR:NOT_READY
 LIST:COUNT=12
 REC:SEQ=12|UID=A1B2C3D4|SID=1001|NORMAL|1782691200|DEV=1|OK
 LIST:END
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.1.10|PORT=9000|TZ=8|SSID=wifi-name|WLOC=hangzhou
+OK:CFG
 ```
 
 `LIST:N` returns the newest `N` records. `LIST:ALL` returns every stored record in storage order. Bad list counts return `ERR:ARG` without sending a partial list.
+
+## Device Config
+
+`CFG?` returns the current persistent device/network config summary. `CFG:` updates one or more fields and stores the result in LittleFS `/config.bin`; firmware then reapplies the runtime display and network model.
+
+Supported fields:
+
+- `DEV`: device id, `1..4294967295`.
+- `MODE`: work mode, `0=normal`, `1=check-in`, `2=check-out`, `3=in/out`.
+- `UPLOAD`: `0` or `1`.
+- `REPEAT`: anti-repeat interval in seconds, `0..65535`.
+- `SSID`, `PWD`: WiFi SSID/password.
+- `HOST`, `PORT`: TCP server host and port.
+- `WKEY`, `WLOC`: weather API key and location.
+- `TZ`: timezone offset, `-12..14`.
+
+String values must not contain `|`, `=` or control characters. The upper-computer sends long config as multiple `CFG:` lines so each line fits the firmware serial buffer.
 
 ## Image Card Blocks
 

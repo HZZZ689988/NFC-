@@ -10,8 +10,10 @@ from nfc_attendance_tool.database import Database, Person, parse_record_line
 from nfc_attendance_tool.image_codec import build_image_blocks
 from nfc_attendance_tool.protocol import (
     CardType,
+    DeviceConfigPayload,
     PersonPayload,
     build_clear,
+    build_config_commands,
     build_crc_frame,
     build_issue,
     chunk_commands,
@@ -33,6 +35,43 @@ def test_crc16_frame_roundtrip() -> None:
     frame = build_crc_frame("PING")
     assert frame == "$PING*6427\n"
     assert parse_crc_frame(frame) == "PING"
+
+
+def test_build_config_commands() -> None:
+    commands = build_config_commands(
+        DeviceConfigPayload(
+            device_id=7,
+            work_mode=3,
+            upload_enable=True,
+            repeat_interval_sec=60,
+            wifi_ssid="test-ssid",
+            wifi_password="secret",
+            server_host="192.168.1.10",
+            server_port=9000,
+            weather_key="weather-key",
+            weather_location="hangzhou",
+            timezone=8,
+        )
+    )
+
+    assert commands == [
+        "CFG:DEV=7|MODE=3|UPLOAD=1|REPEAT=60|TZ=8\n",
+        "CFG:SSID=test-ssid\n",
+        "CFG:PWD=secret\n",
+        "CFG:HOST=192.168.1.10|PORT=9000\n",
+        "CFG:WKEY=weather-key|WLOC=hangzhou\n",
+    ]
+
+
+def test_build_config_rejects_ambiguous_text() -> None:
+    try:
+        build_config_commands(
+            DeviceConfigPayload(1, 3, True, 60, "ssid|bad", "", "127.0.0.1", 9000, "", "hangzhou", 8)
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("ambiguous config text was accepted")
 
 
 def test_issue_rejects_uint32_overflow() -> None:

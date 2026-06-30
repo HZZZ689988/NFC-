@@ -23,6 +23,7 @@ updated: 2026-06-30
 - [x] Add OLED BSP, `att_display` and FreeRTOS display task to linked firmware.
 - [x] Add RTC BSP, NTP-to-RTC write path and `/weather.txt` weather cache path to linked firmware.
 - [x] Add LED BSP, MIDI buzzer BSP and FreeRTOS local feedback routing to linked firmware.
+- [x] Add `CFG:` device/network config writes to firmware and upper-computer segmented config commands.
 
 ## Host Verification
 
@@ -43,6 +44,7 @@ updated: 2026-06-30
 - [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
 - [x] Feedback callback paths and full STM32 firmware compile with LED/MIDI buzzer integration.
+- [x] Protocol and Python tests cover `CFG:` config command construction, persistence and runtime apply callback paths.
 - [ ] Native C host test executables run on a machine with `gcc`, `clang`, `cl` or `zig`.
 - [ ] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
 - [ ] Clean or suppress inherited OLED `GUISlim.c` `-Wmisleading-indentation` warnings after functional bring-up.
@@ -63,6 +65,8 @@ updated: 2026-06-30
 - [ ] `UPDATEIMG` returns `ERR:NOT_READY` when any image block is missing.
 - [ ] Image-card block contents can be read back from RC522 and match upper-computer generated bitmap data.
 - [ ] USART1 responds to `PING` and `CFG?`.
+- [ ] USART1 accepts segmented `CFG:` writes and persists `/config.bin` on W25Q128/LittleFS.
+- [ ] `CFG:` WiFi/server/weather/timezone changes are reflected in ESP01S startup behavior after config write.
 - [ ] USART1 `LIST:N` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
 - [ ] ESP01S connects WiFi.
 - [ ] NTP sync updates RTC.

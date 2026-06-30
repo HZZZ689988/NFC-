@@ -9,6 +9,9 @@
 #include "att_crc16.h"
 #include "att_storage.h"
 
+static att_protocol_config_apply_fn s_config_apply;
+static void *s_config_apply_ctx;
+
 static int hex_to_nibble(char ch)
 {
     if (ch >= '0' && ch <= '9') {
@@ -53,6 +56,96 @@ static int parse_hex_block16(const char *hex, uint8_t out[16])
         out[i] = (uint8_t)((hi << 4) | lo);
     }
     return 0;
+}
+
+static uint8_t parse_u32_text(const char *text, uint32_t max_value, uint32_t *value)
+{
+    if (text == NULL || value == NULL || *text == '\0') {
+        return 0u;
+    }
+
+    uint32_t parsed = 0u;
+    const char *p = text;
+    while (*p != '\0') {
+        if (*p < '0' || *p > '9') {
+            return 0u;
+        }
+
+        uint32_t digit = (uint32_t)(*p - '0');
+        if (parsed > (UINT32_MAX - digit) / 10u) {
+            return 0u;
+        }
+        parsed = (parsed * 10u) + digit;
+        if (parsed > max_value) {
+            return 0u;
+        }
+        p++;
+    }
+
+    *value = parsed;
+    return 1u;
+}
+
+static uint8_t parse_i8_text(const char *text, int8_t min_value, int8_t max_value, int8_t *value)
+{
+    if (text == NULL || value == NULL || *text == '\0') {
+        return 0u;
+    }
+
+    int sign = 1;
+    if (*text == '-') {
+        sign = -1;
+        text++;
+    } else if (*text == '+') {
+        text++;
+    }
+
+    uint32_t magnitude = 0u;
+    if (parse_u32_text(text, 127u, &magnitude) == 0u) {
+        return 0u;
+    }
+
+    int parsed = (int)magnitude * sign;
+    if (parsed < (int)min_value || parsed > (int)max_value) {
+        return 0u;
+    }
+
+    *value = (int8_t)parsed;
+    return 1u;
+}
+
+static uint8_t config_text_is_valid(const char *text)
+{
+    if (text == NULL) {
+        return 0u;
+    }
+
+    for (const char *p = text; *p != '\0'; ++p) {
+        unsigned char ch = (unsigned char)*p;
+        if (ch < 0x20u || ch == '|' || ch == '=') {
+            return 0u;
+        }
+    }
+
+    return 1u;
+}
+
+static att_status_t copy_config_text(char *dest, size_t dest_len, const char *src)
+{
+    if (dest == NULL || src == NULL || dest_len == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    if (config_text_is_valid(src) == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    size_t len = strlen(src);
+    if (len >= dest_len) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    memcpy(dest, src, len + 1u);
+    return ATT_OK;
 }
 
 static void uid_to_hex(const att_uid_t *uid, char out[ATT_UID_HEX_LEN + 1u])
@@ -104,6 +197,133 @@ static void send_card_status(att_status_t status, const char *ok_line,
         send("ERR:CARD\n", ctx);
         break;
     }
+}
+
+static att_status_t apply_config_update(att_device_config_t *config)
+{
+    att_status_t status = att_storage_save_config(config);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    if (s_config_apply != NULL) {
+        (void)s_config_apply(config, s_config_apply_ctx);
+    }
+
+    return ATT_OK;
+}
+
+static att_status_t handle_config_set(const char *payload)
+{
+    if (payload == NULL || strncmp(payload, "CFG:", 4) != 0) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    att_device_config_t config;
+    att_status_t status = att_storage_load_config(&config);
+    if (status != ATT_OK) {
+        att_storage_default_config(&config);
+    }
+
+    const char *cursor = payload + 4;
+    if (*cursor == '\0') {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    while (*cursor != '\0') {
+        const char *separator = strchr(cursor, '|');
+        size_t token_len = separator == NULL ? strlen(cursor) : (size_t)(separator - cursor);
+        char token[96];
+        if (token_len == 0u || token_len >= sizeof(token)) {
+            return ATT_ERR_INVALID_ARG;
+        }
+
+        memcpy(token, cursor, token_len);
+        token[token_len] = '\0';
+
+        char *equals = strchr(token, '=');
+        if (equals == NULL || equals == token) {
+            return ATT_ERR_INVALID_ARG;
+        }
+
+        *equals = '\0';
+        const char *key = token;
+        const char *value = equals + 1;
+        uint32_t parsed = 0u;
+        int8_t parsed_i8 = 0;
+
+        if (strcmp(key, "DEV") == 0) {
+            if (parse_u32_text(value, UINT32_MAX, &parsed) == 0u || parsed == 0u) {
+                return ATT_ERR_INVALID_ARG;
+            }
+            config.device_id = parsed;
+        } else if (strcmp(key, "MODE") == 0) {
+            if (parse_u32_text(value, 3u, &parsed) == 0u) {
+                return ATT_ERR_INVALID_ARG;
+            }
+            config.work_mode = (att_work_mode_t)parsed;
+        } else if (strcmp(key, "UPLOAD") == 0) {
+            if (parse_u32_text(value, 1u, &parsed) == 0u) {
+                return ATT_ERR_INVALID_ARG;
+            }
+            config.upload_enable = (uint8_t)parsed;
+        } else if (strcmp(key, "REPEAT") == 0) {
+            if (parse_u32_text(value, UINT16_MAX, &parsed) == 0u) {
+                return ATT_ERR_INVALID_ARG;
+            }
+            config.repeat_interval_sec = (uint16_t)parsed;
+        } else if (strcmp(key, "SSID") == 0) {
+            status = copy_config_text(config.wifi_ssid, sizeof(config.wifi_ssid), value);
+            if (status != ATT_OK) {
+                return status;
+            }
+        } else if (strcmp(key, "PWD") == 0) {
+            status = copy_config_text(config.wifi_password, sizeof(config.wifi_password), value);
+            if (status != ATT_OK) {
+                return status;
+            }
+        } else if (strcmp(key, "HOST") == 0) {
+            status = copy_config_text(config.server_host, sizeof(config.server_host), value);
+            if (status != ATT_OK) {
+                return status;
+            }
+        } else if (strcmp(key, "PORT") == 0) {
+            if (parse_u32_text(value, UINT16_MAX, &parsed) == 0u || parsed == 0u) {
+                return ATT_ERR_INVALID_ARG;
+            }
+            config.server_port = (uint16_t)parsed;
+        } else if (strcmp(key, "WKEY") == 0) {
+            status = copy_config_text(config.weather_key, sizeof(config.weather_key), value);
+            if (status != ATT_OK) {
+                return status;
+            }
+        } else if (strcmp(key, "WLOC") == 0) {
+            status = copy_config_text(config.weather_location, sizeof(config.weather_location), value);
+            if (status != ATT_OK) {
+                return status;
+            }
+        } else if (strcmp(key, "TZ") == 0) {
+            if (parse_i8_text(value, -12, 14, &parsed_i8) == 0u) {
+                return ATT_ERR_INVALID_ARG;
+            }
+            config.timezone = parsed_i8;
+        } else {
+            return ATT_ERR_INVALID_ARG;
+        }
+
+        if (separator == NULL) {
+            break;
+        }
+        cursor = separator + 1;
+    }
+
+    return apply_config_update(&config);
+}
+
+void att_protocol_set_config_apply(att_protocol_config_apply_fn apply, void *ctx)
+{
+    s_config_apply = apply;
+    s_config_apply_ctx = ctx;
 }
 
 att_status_t att_protocol_build_frame(const char *payload, char *out, size_t out_len)
@@ -193,13 +413,36 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
             send("ERR:CFG\n", ctx);
             return ATT_ERR_STORAGE;
         }
-        char response[128];
-        snprintf(response, sizeof(response), "CFG:DEV=%lu|MODE=%u|UPLOAD=%u\n",
+        char response[256];
+        snprintf(response, sizeof(response),
+                 "CFG:DEV=%lu|MODE=%u|UPLOAD=%u|REPEAT=%u|HOST=%s|PORT=%u|TZ=%d|SSID=%s|WLOC=%s\n",
                  (unsigned long)config.device_id,
                  (unsigned int)config.work_mode,
-                 (unsigned int)config.upload_enable);
+                 (unsigned int)config.upload_enable,
+                 (unsigned int)config.repeat_interval_sec,
+                 config.server_host,
+                 (unsigned int)config.server_port,
+                 (int)config.timezone,
+                 config.wifi_ssid,
+                 config.weather_location);
         send(response, ctx);
         return ATT_OK;
+    }
+
+    if (strncmp(payload, "CFG:", 4) == 0) {
+        att_status_t status = handle_config_set(payload);
+        switch (status) {
+        case ATT_OK:
+            send("OK:CFG\n", ctx);
+            break;
+        case ATT_ERR_STORAGE:
+            send("ERR:CFG\n", ctx);
+            break;
+        default:
+            send("ERR:ARG\n", ctx);
+            break;
+        }
+        return status;
     }
 
     if (strncmp(payload, "ISSUE:", 6) == 0) {

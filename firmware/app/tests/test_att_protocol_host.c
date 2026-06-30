@@ -25,6 +25,11 @@ static uint8_t g_last_image_index;
 static uint8_t g_last_image_block[16];
 static unsigned g_image_calls;
 static unsigned g_update_image_calls;
+static att_device_config_t g_config;
+static unsigned g_save_config_calls;
+static unsigned g_apply_config_calls;
+static att_device_config_t g_saved_config;
+static att_device_config_t g_applied_config;
 
 static void capture_send(const char *line, void *ctx)
 {
@@ -60,6 +65,19 @@ static void reset_mocks(void)
     memset(g_last_image_block, 0, sizeof(g_last_image_block));
     g_image_calls = 0u;
     g_update_image_calls = 0u;
+    memset(&g_config, 0, sizeof(g_config));
+    g_config.device_id = 1u;
+    g_config.work_mode = ATT_MODE_IN_OUT;
+    g_config.upload_enable = 1u;
+    g_config.repeat_interval_sec = 60u;
+    g_config.server_port = 9000u;
+    g_config.timezone = 8;
+    snprintf(g_config.server_host, sizeof(g_config.server_host), "%s", "192.168.1.10");
+    g_save_config_calls = 0u;
+    g_apply_config_calls = 0u;
+    memset(&g_saved_config, 0, sizeof(g_saved_config));
+    memset(&g_applied_config, 0, sizeof(g_applied_config));
+    att_protocol_set_config_apply(NULL, NULL);
 }
 
 static void test_read_returns_uid(void)
@@ -170,6 +188,62 @@ static void test_list_rejects_bad_count_before_storage_access(void)
                 "bad LIST count should only report argument error");
 }
 
+static att_status_t capture_config_apply(const att_device_config_t *config, void *ctx)
+{
+    (void)ctx;
+    if (config == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    g_applied_config = *config;
+    g_apply_config_calls++;
+    return ATT_OK;
+}
+
+static void test_config_query_returns_persisted_config(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("CFG?", capture_send, &capture);
+
+    require_int(status == ATT_OK, "CFG? should return ATT_OK");
+    require_int(strcmp(capture.text,
+                       "CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.1.10|PORT=9000|TZ=8|SSID=|WLOC=\n") == 0,
+                "CFG? should return stored config fields");
+}
+
+static void test_config_set_saves_and_applies_config(void)
+{
+    reset_mocks();
+    att_protocol_set_config_apply(capture_config_apply, NULL);
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line(
+        "CFG:DEV=7|MODE=2|UPLOAD=0|REPEAT=120|TZ=8", capture_send, &capture);
+
+    require_int(status == ATT_OK, "CFG set should return ATT_OK");
+    require_int(strcmp(capture.text, "OK:CFG\n") == 0, "CFG set should acknowledge update");
+    require_int(g_save_config_calls == 1u, "CFG set should save config");
+    require_int(g_apply_config_calls == 1u, "CFG set should apply runtime config");
+    require_int(g_saved_config.device_id == 7u, "CFG set should update device id");
+    require_int(g_saved_config.work_mode == ATT_MODE_CHECK_OUT, "CFG set should update mode");
+    require_int(g_saved_config.upload_enable == 0u, "CFG set should update upload flag");
+    require_int(g_saved_config.repeat_interval_sec == 120u, "CFG set should update repeat interval");
+    require_int(g_applied_config.device_id == 7u, "CFG set should pass saved config to callback");
+}
+
+static void test_config_set_rejects_bad_value(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("CFG:PORT=0", capture_send, &capture);
+
+    require_int(status == ATT_ERR_INVALID_ARG, "bad CFG value should return invalid arg");
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0, "bad CFG value should report argument error");
+    require_int(g_save_config_calls == 0u, "bad CFG value should not save config");
+}
+
 static void test_image_block_command_calls_card_writer(void)
 {
     reset_mocks();
@@ -207,6 +281,9 @@ int main(void)
     test_clear_calls_card_clear();
     test_list_streams_records();
     test_list_rejects_bad_count_before_storage_access();
+    test_config_query_returns_persisted_config();
+    test_config_set_saves_and_applies_config();
+    test_config_set_rejects_bad_value();
     test_image_block_command_calls_card_writer();
     test_update_image_calls_card_finish();
     return 0;
@@ -291,16 +368,19 @@ att_status_t att_storage_load_config(att_device_config_t *config)
     if (config == NULL) {
         return ATT_ERR_INVALID_ARG;
     }
-    memset(config, 0, sizeof(*config));
-    config->device_id = 1u;
-    config->work_mode = ATT_MODE_IN_OUT;
-    config->upload_enable = 1u;
+    *config = g_config;
     return ATT_OK;
 }
 
 att_status_t att_storage_save_config(const att_device_config_t *config)
 {
-    return config == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+    if (config == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    g_saved_config = *config;
+    g_config = *config;
+    g_save_config_calls++;
+    return ATT_OK;
 }
 
 void att_storage_default_config(att_device_config_t *config)

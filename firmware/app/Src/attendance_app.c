@@ -81,6 +81,29 @@ static void set_network_state(att_display_network_state_t state)
 
     att_display_set_network(state);
 }
+static att_status_t apply_runtime_config(const att_device_config_t *config, void *ctx)
+{
+    (void)ctx;
+    if (config == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    s_config = *config;
+    att_display_set_config(&s_config);
+#if ATT_ENABLE_NETWORK
+    s_network_ready = (att_network_init(&s_config) == ATT_OK) ? 1u : 0u;
+    s_network_upload_due = 1u;
+    s_network_heartbeat_due = 1u;
+    s_network_time_sync_due = 1u;
+    s_weather_due = 1u;
+    set_network_state(s_network_ready ? ATT_DISPLAY_NET_READY : ATT_DISPLAY_NET_ERROR);
+#else
+    s_network_ready = 0u;
+    set_network_state(ATT_DISPLAY_NET_OFF);
+#endif
+    return ATT_OK;
+}
+
 static void dispatch_serial_line(void)
 {
     s_serial_line[s_serial_line_len] = '\0';
@@ -156,6 +179,7 @@ att_status_t attendance_app_init(void)
     s_feedback = default_feedback;
     s_feedback_ctx = NULL;
     s_network_display_state = ATT_DISPLAY_NET_OFF;
+    att_protocol_set_config_apply(apply_runtime_config, NULL);
 
     att_display_set_config(&s_config);
     att_display_set_record_count(count);

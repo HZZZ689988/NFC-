@@ -54,6 +54,8 @@ updated: 2026-06-30
 - Local NFC polling now pushes attendance OK, duplicate, invalid-card and storage/card-error events to the display model and local LED/buzzer feedback queue.
 - The FreeRTOS display task initializes the OLED GUI/BSP and refreshes standby, attendance-result, network-state and weather-placeholder pages.
 - The old manual LED demo loop is replaced with attendance feedback routing: L1=OK, L2=invalid card, L3=duplicate, L4=fault/network fault, L5=network online, with short TIM3_CH1 `MIDI_Beep()` tones.
+- `CFG:` serial commands persist device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone fields into `/config.bin`; the upper-computer device-config tab sends those updates in buffer-safe segments.
+- `attendance_app` applies saved config updates back into the display model and network config path without requiring a reset.
 
 ## Not Done
 
@@ -61,6 +63,7 @@ updated: 2026-06-30
 - Card account block read/write and CRC invalid-card handling are implemented but not real-board validated.
 - Image-card Mifare block writes and `UPDATEIMG` completeness checking are implemented but not real-board validated.
 - `LIST:N` / `LIST:ALL` record streaming is build-checked but not validated through USART1 against real board storage.
+- `CFG:` config writes are host-tested but not validated through USART1 against real LittleFS `/config.bin` on the board.
 - ESP01S WiFi, TCP, NTP-to-RTC, weather query/cache, heartbeat and upload paths are build-linked/scheduled but not real-board validated.
 - RTC time retention and RTC-derived attendance timestamps are implemented but not real-board validated.
 - OLED GUI/BSP and display task are build-linked but not real-board validated on I2C1 PB6/PB7.

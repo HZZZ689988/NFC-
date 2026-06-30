@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in full-feature firmware integration and host-verification mode. The STM32 base now links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, and local LED/buzzer feedback. Card account reads, image-card block writes, serial attendance record streaming, OLED status pages, RTC/weather integration and LED/buzzer feedback events are implemented in firmware, but hardware validation is still pending.
+The project is in full-feature firmware integration and host-verification mode. The STM32 base now links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Card account reads, image-card block writes, serial attendance record streaming, OLED status pages, RTC/weather integration, LED/buzzer feedback events and `CFG:` config writes are implemented in firmware, but hardware validation is still pending.
 
 ## Implemented
 
@@ -31,6 +31,7 @@ The project is in full-feature firmware integration and host-verification mode. 
 - ESP01S startup can write NTP time into STM32 RTC; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
 - Firmware now stores latest weather text in LittleFS `/weather.txt` and reloads it into the OLED display model at app startup.
 - Firmware feedback events now route attendance/network results to a FreeRTOS queue; L1/L2/L3/L4/L5 and TIM3_CH1 buzzer patterns indicate OK, invalid card, duplicate, fault and network-online states.
+- The upper-computer now has a device config tab that sends segmented `CFG:` commands for device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone; firmware saves those fields into `/config.bin` and reapplies display/network runtime state.
 
 ## Verified On Host
 
@@ -38,7 +39,7 @@ The project is in full-feature firmware integration and host-verification mode. 
 - `python pc_tool/tests/test_core.py` passed.
 - ARM GCC compile-only checks passed for the protocol, serial, NFC and network test sources because no native C compiler is installed in the current environment.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked.
-- STM32 firmware size after this slice: `text=97472`, `data=488`, `bss=46768`.
+- STM32 firmware size after this slice: `text=98928`, `data=488`, `bss=46776`.
 
 ## Not Yet Hardware Validated
 
@@ -47,6 +48,7 @@ The project is in full-feature firmware integration and host-verification mode. 
 - RC522 card account block read/write with CRC16 and UID consistency on a real card.
 - RC522 image-card write flow: 24 portrait blocks, 10 name blocks, 10 department blocks and `UPDATEIMG`.
 - USART1 `LIST:N` / `LIST:ALL` record streaming against real persistent records.
+- USART1 `CFG:` config writes to `/config.bin` and resulting ESP01S/display runtime config on the real board.
 - ESP01S WiFi, NTP-to-RTC, weather query/cache, heartbeat and TCP upload.
 - RTC retention and RTC-derived attendance timestamps on real LSE/VBAT conditions.
 - OLED page display on real I2C1 hardware, including standby, attendance result, network state and weather pages.

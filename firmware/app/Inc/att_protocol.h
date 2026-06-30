@@ -10,10 +10,12 @@ extern "C" {
 #endif
 
 typedef void (*att_protocol_send_fn)(const char *line, void *ctx);
+typedef att_status_t (*att_protocol_config_apply_fn)(const att_device_config_t *config, void *ctx);
 
 att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn send, void *ctx);
 att_status_t att_protocol_build_frame(const char *payload, char *out, size_t out_len);
 att_status_t att_protocol_parse_frame(const char *line, char *payload, size_t payload_len);
+void att_protocol_set_config_apply(att_protocol_config_apply_fn apply, void *ctx);
 
 #ifdef __cplusplus
 }

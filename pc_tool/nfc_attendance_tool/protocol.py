@@ -25,6 +25,21 @@ class PersonPayload:
     card_type: CardType
 
 
+@dataclass(frozen=True)
+class DeviceConfigPayload:
+    device_id: int
+    work_mode: int
+    upload_enable: bool
+    repeat_interval_sec: int
+    wifi_ssid: str
+    wifi_password: str
+    server_host: str
+    server_port: int
+    weather_key: str
+    weather_location: str
+    timezone: int
+
+
 def normalize_uid(uid: str) -> str:
     value = uid.strip().replace(" ", "").replace("-", "").upper()
     if not UID_PATTERN.fullmatch(value):
@@ -83,6 +98,10 @@ def build_read() -> str:
     return "READ\n"
 
 
+def build_config_query() -> str:
+    return "CFG?\n"
+
+
 def build_clear(uid_hex: str) -> str:
     return f"CLEAR:{normalize_uid(uid_hex)}\n"
 
@@ -108,6 +127,49 @@ def build_issue(payload: PersonPayload) -> str:
     if payload.points > UINT32_MAX:
         raise ValueError("积分不能超过 32 位无符号整数范围")
     return f"ISSUE:{uid},{payload.sid},{payload.points},{int(payload.card_type)}\n"
+
+
+def _validate_config_text(value: str, label: str, max_len: int) -> str:
+    text = value.strip()
+    if len(text) > max_len:
+        raise ValueError(f"{label} 不能超过 {max_len} 个字符")
+    if any(ord(ch) < 0x20 or ch in "|=" for ch in text):
+        raise ValueError(f"{label} 不能包含 |、= 或控制字符")
+    return text
+
+
+def build_config_commands(payload: DeviceConfigPayload) -> list[str]:
+    if payload.device_id <= 0 or payload.device_id > UINT32_MAX:
+        raise ValueError("设备 ID 必须在 1..4294967295 范围内")
+    if payload.work_mode < 0 or payload.work_mode > 3:
+        raise ValueError("工作模式必须在 0..3 范围内")
+    if payload.repeat_interval_sec < 0 or payload.repeat_interval_sec > 0xFFFF:
+        raise ValueError("防重复间隔必须在 0..65535 秒范围内")
+    if payload.server_port <= 0 or payload.server_port > 0xFFFF:
+        raise ValueError("服务器端口必须在 1..65535 范围内")
+    if payload.timezone < -12 or payload.timezone > 14:
+        raise ValueError("时区必须在 -12..14 范围内")
+
+    ssid = _validate_config_text(payload.wifi_ssid, "WiFi SSID", 31)
+    password = _validate_config_text(payload.wifi_password, "WiFi 密码", 63)
+    host = _validate_config_text(payload.server_host, "服务器地址", 63)
+    weather_key = _validate_config_text(payload.weather_key, "天气 Key", 47)
+    weather_location = _validate_config_text(payload.weather_location, "天气位置", 31)
+
+    return [
+        (
+            "CFG:"
+            f"DEV={payload.device_id}|"
+            f"MODE={payload.work_mode}|"
+            f"UPLOAD={1 if payload.upload_enable else 0}|"
+            f"REPEAT={payload.repeat_interval_sec}|"
+            f"TZ={payload.timezone}\n"
+        ),
+        f"CFG:SSID={ssid}\n",
+        f"CFG:PWD={password}\n",
+        f"CFG:HOST={host}|PORT={payload.server_port}\n",
+        f"CFG:WKEY={weather_key}|WLOC={weather_location}\n",
+    ]
 
 
 def build_image_block(prefix: str, index: int, hex32: str) -> str:

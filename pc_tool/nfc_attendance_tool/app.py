@@ -18,8 +18,11 @@ from .image_codec import (
 )
 from .protocol import (
     CardType,
+    DeviceConfigPayload,
     PersonPayload,
     build_clear,
+    build_config_commands,
+    build_config_query,
     build_issue,
     build_list,
     build_read,
@@ -66,6 +69,17 @@ class AttendanceApp(tk.Tk):
         self.list_count_var = tk.StringVar(value="20")
         self.threshold_var = tk.IntVar(value=150)
         self.status_var = tk.StringVar(value="未连接")
+        self.cfg_device_id_var = tk.StringVar(value="1")
+        self.cfg_work_mode_var = tk.StringVar(value="进出")
+        self.cfg_upload_enable_var = tk.BooleanVar(value=True)
+        self.cfg_repeat_var = tk.StringVar(value="60")
+        self.cfg_wifi_ssid_var = tk.StringVar()
+        self.cfg_wifi_password_var = tk.StringVar()
+        self.cfg_server_host_var = tk.StringVar(value="192.168.1.10")
+        self.cfg_server_port_var = tk.StringVar(value="9000")
+        self.cfg_weather_key_var = tk.StringVar()
+        self.cfg_weather_location_var = tk.StringVar(value="hangzhou")
+        self.cfg_timezone_var = tk.StringVar(value="8")
 
         self.build_styles()
         self.build_layout()
@@ -192,13 +206,16 @@ class AttendanceApp(tk.Tk):
 
         self.people_tab = ttk.Frame(tabs, padding=8)
         self.records_tab = ttk.Frame(tabs, padding=8)
+        self.config_tab = ttk.Frame(tabs, padding=8)
         self.log_tab = ttk.Frame(tabs, padding=8)
         tabs.add(self.people_tab, text="人员管理")
         tabs.add(self.records_tab, text="考勤记录")
+        tabs.add(self.config_tab, text="设备配置")
         tabs.add(self.log_tab, text="通信日志")
 
         self.build_people_tab()
         self.build_records_tab()
+        self.build_config_tab()
         self.build_log_tab()
 
     def build_people_tab(self) -> None:
@@ -267,6 +284,48 @@ class AttendanceApp(tk.Tk):
         records_scroll = ttk.Scrollbar(self.records_tab, orient=tk.VERTICAL, command=self.records_tree.yview)
         records_scroll.grid(row=1, column=1, sticky="ns")
         self.records_tree.configure(yscrollcommand=records_scroll.set)
+
+    def build_config_tab(self) -> None:
+        self.config_tab.columnconfigure(1, weight=1)
+        self.config_tab.columnconfigure(3, weight=1)
+
+        fields = [
+            ("设备 ID", self.cfg_device_id_var, 0, 0),
+            ("工作模式", self.cfg_work_mode_var, 0, 2),
+            ("防重复秒", self.cfg_repeat_var, 1, 0),
+            ("时区", self.cfg_timezone_var, 1, 2),
+            ("WiFi SSID", self.cfg_wifi_ssid_var, 2, 0),
+            ("WiFi 密码", self.cfg_wifi_password_var, 2, 2),
+            ("服务器", self.cfg_server_host_var, 3, 0),
+            ("端口", self.cfg_server_port_var, 3, 2),
+            ("天气 Key", self.cfg_weather_key_var, 4, 0),
+            ("天气位置", self.cfg_weather_location_var, 4, 2),
+        ]
+        for label, var, row, col in fields:
+            ttk.Label(self.config_tab, text=label).grid(row=row, column=col, sticky="w", padx=(0, 6), pady=5)
+            if var is self.cfg_work_mode_var:
+                widget = ttk.Combobox(
+                    self.config_tab,
+                    textvariable=var,
+                    values=("普通", "签到", "签退", "进出"),
+                    state="readonly",
+                )
+            else:
+                show = "*" if var is self.cfg_wifi_password_var else ""
+                widget = ttk.Entry(self.config_tab, textvariable=var, show=show)
+            widget.grid(row=row, column=col + 1, sticky="ew", padx=(0, 14), pady=5)
+
+        ttk.Checkbutton(self.config_tab, text="启用上传", variable=self.cfg_upload_enable_var).grid(
+            row=5, column=0, columnspan=2, sticky="w", pady=(6, 0)
+        )
+
+        actions = ttk.Frame(self.config_tab)
+        actions.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(12, 0))
+        self.query_config_btn = ttk.Button(actions, text="读取配置", command=self.query_config)
+        self.query_config_btn.pack(side=tk.LEFT)
+        self.write_config_btn = ttk.Button(actions, text="写入配置", style="Action.TButton", command=self.write_config)
+        self.write_config_btn.pack(side=tk.LEFT, padx=8)
+        self.serial_buttons.extend([self.query_config_btn, self.write_config_btn])
 
     def build_log_tab(self) -> None:
         self.log_tab.rowconfigure(0, weight=1)
@@ -445,6 +504,41 @@ class AttendanceApp(tk.Tk):
             command = build_list(None)
         self.run_serial_job("查询记录", [command], expect_multi=True, import_records=True)
 
+    def collect_device_config(self) -> DeviceConfigPayload:
+        modes = {"普通": 0, "签到": 1, "签退": 2, "进出": 3}
+        try:
+            device_id = int(self.cfg_device_id_var.get())
+            repeat = int(self.cfg_repeat_var.get())
+            port = int(self.cfg_server_port_var.get())
+            timezone = int(self.cfg_timezone_var.get())
+        except ValueError as exc:
+            raise ValueError("设备 ID、防重复秒、端口和时区必须是整数") from exc
+
+        return DeviceConfigPayload(
+            device_id=device_id,
+            work_mode=modes[self.cfg_work_mode_var.get()],
+            upload_enable=bool(self.cfg_upload_enable_var.get()),
+            repeat_interval_sec=repeat,
+            wifi_ssid=self.cfg_wifi_ssid_var.get(),
+            wifi_password=self.cfg_wifi_password_var.get(),
+            server_host=self.cfg_server_host_var.get(),
+            server_port=port,
+            weather_key=self.cfg_weather_key_var.get(),
+            weather_location=self.cfg_weather_location_var.get(),
+            timezone=timezone,
+        )
+
+    def query_config(self) -> None:
+        self.run_serial_job("读取配置", [build_config_query()], expect_multi=True)
+
+    def write_config(self) -> None:
+        try:
+            commands = build_config_commands(self.collect_device_config())
+        except Exception as exc:
+            messagebox.showwarning(APP_TITLE, str(exc))
+            return
+        self.run_serial_job("写入配置", commands)
+
     def run_serial_job(
         self,
         title: str,
@@ -503,6 +597,8 @@ class AttendanceApp(tk.Tk):
         upper = line.strip().upper()
         if upper.startswith("UID:"):
             self.ui_queue.put(("uid", line.split(":", 1)[1].strip()))
+        elif upper.startswith("CFG:"):
+            self.ui_queue.put(("config", line.strip()))
 
     def process_ui_queue(self) -> None:
         try:
@@ -514,6 +610,8 @@ class AttendanceApp(tk.Tk):
                     self.status_var.set(str(payload))
                 elif kind == "uid":
                     self.uid_var.set(str(payload))
+                elif kind == "config":
+                    self.apply_config_line(str(payload))
                 elif kind == "refresh":
                     self.refresh_people()
                     self.refresh_records()
@@ -532,6 +630,35 @@ class AttendanceApp(tk.Tk):
     def append_log(self, message: str) -> None:
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
+
+    def apply_config_line(self, line: str) -> None:
+        if not line.startswith("CFG:"):
+            return
+        fields: dict[str, str] = {}
+        for part in line[4:].split("|"):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                fields[key.upper()] = value
+
+        mode_names = {"0": "普通", "1": "签到", "2": "签退", "3": "进出"}
+        if "DEV" in fields:
+            self.cfg_device_id_var.set(fields["DEV"])
+        if "MODE" in fields:
+            self.cfg_work_mode_var.set(mode_names.get(fields["MODE"], self.cfg_work_mode_var.get()))
+        if "UPLOAD" in fields:
+            self.cfg_upload_enable_var.set(fields["UPLOAD"] == "1")
+        if "REPEAT" in fields:
+            self.cfg_repeat_var.set(fields["REPEAT"])
+        if "SSID" in fields:
+            self.cfg_wifi_ssid_var.set(fields["SSID"])
+        if "HOST" in fields:
+            self.cfg_server_host_var.set(fields["HOST"])
+        if "PORT" in fields:
+            self.cfg_server_port_var.set(fields["PORT"])
+        if "WLOC" in fields:
+            self.cfg_weather_location_var.set(fields["WLOC"])
+        if "TZ" in fields:
+            self.cfg_timezone_var.set(fields["TZ"])
 
     def refresh_people(self) -> None:
         for item in self.people_tree.get_children():
