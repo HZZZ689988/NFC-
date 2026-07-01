@@ -428,3 +428,47 @@ The generated 12px GBK dot matrix was also parsed locally for the test codes
 recognizable stroke structures. If the physical OLED still shows unreadable
 Chinese after this firmware, the next focus should be OLED bit order/scan
 orientation or the generated font export settings, not the serial command path.
+
+## OLED 16px GBK Font Iteration
+
+Physical OLED feedback for the 12px font was: Chinese was recognizable, but
+many strokes were missing and character error rate was high. This is consistent
+with 12px Chinese glyphs being too low-resolution for reliable recognition.
+
+The diagnostic was changed again to use the board demo `FangSong_16.c` subset:
+
+- The firmware now links `../Bsp/OLED/FangSong_16.c`.
+- `OLEDTEST` keeps the first three rows as 8px ASCII reference text.
+- The label `16PX GBK` is drawn with the default 8px font.
+- The two Chinese rows are drawn with `GUI_FontHZ_FangSong_16` at y=32 and
+  y=48, using direct GBK codes.
+
+Expected OLED test content:
+
+```text
+OLED FONT TEST
+ASCII OK 012345
+CMD:OLEDTEST
+16PX GBK
+杭电科技大学
+曾州子毓
+```
+
+Software validation:
+
+```text
+Host tests: passed
+Firmware build: passed, text=105760 data=496 bss=46496
+16px GBK dot-matrix parse: glyphs are visibly more complete than 12px
+```
+
+Download attempt was blocked by USB device enumeration:
+
+```text
+openocd.exe ... program build/Demo_W25Q128.elf verify reset exit
+Error: unable to find a matching CMSIS-DAP device
+Get-CimInstance Win32_SerialPort: no COM3/CMSIS-DAP serial device present
+```
+
+Next action after reconnecting the board is to flash `build/Demo_W25Q128.elf`
+and send `OLEDTEST` over `COM3`.
