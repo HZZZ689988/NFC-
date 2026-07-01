@@ -25,6 +25,7 @@ Legacy newline commands are still accepted during bring-up.
 
 ```text
 READ
+DIAG?
 ISSUE:UID,SID,POINTS,CARD_TYPE
 IMGA00:HEX32
 IMGN00:HEX32
@@ -46,6 +47,7 @@ Expected replies:
 
 ```text
 UID:A1B2C3D4
+DIAG:RC522_VER=0x92|TX=0x03|ERR=0x00|REQ=-2|TAG=0400
 OK
 OK:ISSUE
 OK:IMG
@@ -61,6 +63,11 @@ LIST:END
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.1.10|PORT=9000|TZ=8|SSID=wifi-name|WLOC=hangzhou
 OK:CFG
 ```
+
+`DIAG?` reads RC522 diagnostic registers without modifying card data. A healthy
+MFRC522 clone normally reports `RC522_VER=0x91` or `0x92`, and `TX` should have
+the lower antenna bits set after initialization. `RC522_VER=0x00` or `0xFF`
+means the MCU is not communicating with the RC522 over the configured wiring.
 
 `LIST:N` returns the newest `N` records. `LIST:ALL` returns every stored record in storage order. Bad list counts return `ERR:ARG` without sending a partial list.
 

@@ -348,6 +348,11 @@ void RC522_AntennaOff(void)
     rc522_clear_bit_mask(RC522_REG_TXCONTROL, 0x03);
 }
 
+uint8_t RC522_ReadRegister(uint8_t reg)
+{
+    return rc522_read_reg(reg);
+}
+
 /* ---------- 卡片基本操作 ---------- */
 
 char RC522_Request(uint8_t req_code, uint8_t *pTagType)

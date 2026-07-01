@@ -19,9 +19,18 @@ typedef enum {
     ATT_CARD_IMAGE_DEPARTMENT = 2,
 } att_card_image_area_t;
 
+typedef struct {
+    uint8_t version;
+    uint8_t tx_control;
+    uint8_t error;
+    int8_t request_status;
+    uint8_t tag_type[2];
+} att_card_diag_t;
+
 att_status_t att_card_clear_checked(const att_uid_t *expected_uid);
 att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t index, const uint8_t data[16]);
 att_status_t att_card_finish_image_update(void);
+att_status_t att_card_diag(att_card_diag_t *diag);
 
 #ifdef __cplusplus
 }

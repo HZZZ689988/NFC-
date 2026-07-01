@@ -212,6 +212,15 @@ att_status_t att_card_read_person(att_person_t *person)
     return g_card_status;
 }
 
+att_status_t att_card_diag(att_card_diag_t *diag)
+{
+    if (diag == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(diag, 0, sizeof(*diag));
+    return ATT_OK;
+}
+
 att_status_t att_card_issue_checked(const att_person_t *person)
 {
     return person == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;

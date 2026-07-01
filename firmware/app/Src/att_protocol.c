@@ -429,6 +429,27 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
         return ATT_OK;
     }
 
+    if (strcmp(payload, "DIAG?") == 0) {
+        att_card_diag_t diag;
+        att_status_t status = att_card_diag(&diag);
+        if (status != ATT_OK) {
+            send("ERR:DIAG\n", ctx);
+            return status;
+        }
+
+        char response[96];
+        snprintf(response, sizeof(response),
+                 "DIAG:RC522_VER=0x%02X|TX=0x%02X|ERR=0x%02X|REQ=%d|TAG=%02X%02X\n",
+                 diag.version,
+                 diag.tx_control,
+                 diag.error,
+                 (int)diag.request_status,
+                 diag.tag_type[0],
+                 diag.tag_type[1]);
+        send(response, ctx);
+        return ATT_OK;
+    }
+
     if (strncmp(payload, "CFG:", 4) == 0) {
         att_status_t status = handle_config_set(payload);
         switch (status) {

@@ -12,6 +12,8 @@ typedef struct {
 
 static att_uid_t g_card_uid = {{0xA1, 0xB2, 0xC3, 0xD4}};
 static att_status_t g_read_uid_status = ATT_OK;
+static att_status_t g_diag_status = ATT_OK;
+static att_card_diag_t g_diag;
 static att_status_t g_issue_status = ATT_OK;
 static att_status_t g_clear_status = ATT_OK;
 static att_person_t g_last_person;
@@ -54,6 +56,14 @@ static void reset_mocks(void)
     g_card_uid.bytes[2] = 0xC3;
     g_card_uid.bytes[3] = 0xD4;
     g_read_uid_status = ATT_OK;
+    g_diag_status = ATT_OK;
+    memset(&g_diag, 0, sizeof(g_diag));
+    g_diag.version = 0x92u;
+    g_diag.tx_control = 0x03u;
+    g_diag.error = 0x00u;
+    g_diag.request_status = -2;
+    g_diag.tag_type[0] = 0x04u;
+    g_diag.tag_type[1] = 0x00u;
     g_issue_status = ATT_OK;
     g_clear_status = ATT_OK;
     memset(g_records, 0, sizeof(g_records));
@@ -212,6 +222,31 @@ static void test_config_query_returns_persisted_config(void)
                 "CFG? should return stored config fields");
 }
 
+static void test_diag_query_returns_rc522_registers(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("DIAG?", capture_send, &capture);
+
+    require_int(status == ATT_OK, "DIAG? should return ATT_OK");
+    require_int(strcmp(capture.text,
+                       "DIAG:RC522_VER=0x92|TX=0x03|ERR=0x00|REQ=-2|TAG=0400\n") == 0,
+                "DIAG? should return RC522 diagnostic fields");
+}
+
+static void test_diag_query_maps_driver_error(void)
+{
+    reset_mocks();
+    g_diag_status = ATT_ERR_NOT_READY;
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("DIAG?", capture_send, &capture);
+
+    require_int(status == ATT_ERR_NOT_READY, "DIAG? should return card diagnostic status");
+    require_int(strcmp(capture.text, "ERR:DIAG\n") == 0, "DIAG? should map diagnostic error");
+}
+
 static void test_config_set_saves_and_applies_config(void)
 {
     reset_mocks();
@@ -282,6 +317,8 @@ int main(void)
     test_list_streams_records();
     test_list_rejects_bad_count_before_storage_access();
     test_config_query_returns_persisted_config();
+    test_diag_query_returns_rc522_registers();
+    test_diag_query_maps_driver_error();
     test_config_set_saves_and_applies_config();
     test_config_set_rejects_bad_value();
     test_image_block_command_calls_card_writer();
@@ -313,6 +350,15 @@ att_status_t att_card_read_person(att_person_t *person)
     person->sid = 1001u;
     person->card_type = ATT_CARD_NORMAL;
     return g_read_uid_status;
+}
+
+att_status_t att_card_diag(att_card_diag_t *diag)
+{
+    if (diag == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    *diag = g_diag;
+    return g_diag_status;
 }
 
 att_status_t att_card_issue_checked(const att_person_t *person)

@@ -220,6 +220,7 @@ void RC522_AntennaOn(void);
  * @brief 关闭天线
  */
 void RC522_AntennaOff(void);
+uint8_t RC522_ReadRegister(uint8_t reg);
 
 // ---------- 卡片基本操作 ----------
 

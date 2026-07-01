@@ -134,6 +134,21 @@ att_status_t att_card_init(void)
     return ATT_OK;
 }
 
+att_status_t att_card_diag(att_card_diag_t *diag)
+{
+    if (diag == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    memset(diag, 0, sizeof(*diag));
+    RC522_ConfigISOType('A');
+    diag->version = RC522_ReadRegister(RC522_REG_VERSION);
+    diag->tx_control = RC522_ReadRegister(RC522_REG_TXCONTROL);
+    diag->error = RC522_ReadRegister(RC522_REG_ERROR);
+    diag->request_status = (int8_t)RC522_Request(RC522_PICC_REQALL, diag->tag_type);
+    return ATT_OK;
+}
+
 static att_status_t read_uid_selected(att_uid_t *uid)
 {
     if (uid == NULL) {
