@@ -72,7 +72,7 @@ void RC522_Only_Diag_Run(void)
     UartDrv_SetDebugPort(&s_diag_uart);
 
     printf("\r\nRC522-only diagnostic firmware started\r\n");
-    printf("Pins: NSS=PB13 SCK=PB11 MOSI=PC4 MISO=PA1 RST=PA2 3V3/GND physical\r\n");
+    printf("Pins: GND=PB10 NSS=PE15 SCK=PD9 MOSI=PA0 MISO=PB13 RST=PB15 3V3 physical\r\n");
     printf("Goal: VER should be 0x91 or 0x92 before card tests matter\r\n");
 
     RC522_Platform_Init();

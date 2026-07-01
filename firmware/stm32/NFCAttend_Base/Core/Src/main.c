@@ -61,6 +61,7 @@ UartDrv_t g_uart6Drv;
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
+static void RC522_ControlledGround_EarlyInit(void);
 #ifdef RC522_ONLY_DIAG
 void RC522_Only_Diag_Run(void);
 #endif
@@ -69,6 +70,19 @@ void RC522_Only_Diag_Run(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void RC522_ControlledGround_EarlyInit(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  HAL_GPIO_WritePin(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET);
+  GPIO_InitStruct.Pin = NFC_GND_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NFC_GND_GPIO_Port, &GPIO_InitStruct);
+}
 
 /* USER CODE END 0 */
 
@@ -89,6 +103,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  RC522_ControlledGround_EarlyInit();
 
   /* USER CODE END Init */
 

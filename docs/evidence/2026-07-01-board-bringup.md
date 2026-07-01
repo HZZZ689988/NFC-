@@ -322,3 +322,62 @@ Interpretation:
 - The remaining validation should be electrical: scope/logic-analyzer
   `PB13/NSS`, `PB11/SCK`, `PC4/MOSI`, `PA1/MISO`, `PA2/RST`, confirm module
   3.3 V/GND/orientation, and resolve the `PC4` shared W25Q128-CS risk.
+
+## RC522 Remap With Controlled PB10 Ground
+
+The RC522 firmware mapping was changed to match the available board header:
+
+```text
+RC522 VCC        -> 3.3V
+RC522 GND        -> PB10, configured as push-pull output low
+RC522 SDA/SS/CS  -> PE15
+RC522 SCK        -> PD9
+RC522 MOSI       -> PA0
+RC522 MISO       -> PB13
+RC522 RST        -> PB15
+RC522 IRQ        -> not connected
+```
+
+Implementation notes:
+
+- `main()` now configures PB10 low immediately after `HAL_Init()`, before
+  system clock and peripheral initialization.
+- `MX_GPIO_Init()` and `RC522_Platform_Init()` both keep PB10 low and
+  configure all RC522 pins for the remapped header.
+- `RC522_Platform_ReadPins()` reports PB10 as bit `0x20`; a healthy controlled
+  ground should leave that bit clear.
+- `make RC522_ONLY_DIAG=1` now builds into `build_rc522_only/` so the
+  diagnostic image cannot reuse stale normal-app objects when the macro changes.
+
+Build/download commands used:
+
+```text
+make
+openocd.exe -f .\openocd.cfg -c "adapter speed 1000" -c "program build/Demo_W25Q128.elf verify reset exit"
+make RC522_ONLY_DIAG=1
+openocd.exe -f .\openocd.cfg -c "adapter speed 1000" -c "program build_rc522_only/RC522_Only_Diag.elf verify reset exit"
+```
+
+RC522-only result captured from `COM3`:
+
+```text
+RC522_ONLY:RAW=0x00|VER=0x00|CMD=0x00->0x00|IRQ=0x00->0x00|FIFO=0x00->0x00|TX=0x00->0x00|ERR=0x00->0x00|PINS=0x51->0x51|SHARE=0|REQ=255|TAG=0000|SCAN=255|UID=00000000
+```
+
+Final normal-app result after flashing `build/Demo_W25Q128.elf` back:
+
+```text
+DIAG? -> DIAG:RC522_RAW=0x00|RC522_VER=0x00|CMD=0x00|IRQ=0x00|FIFO=0x00|TX=0x00|ERR=0x00|PINS=0x51|SHARE=0|REQ=-1|TAG=0000
+READ  -> ERR:NO_CARD
+```
+
+Interpretation:
+
+- `SHARE=0` confirms the new MOSI pin `PA0` no longer shares W25Q128 CS `PC4`.
+- `PINS=0x51` means NSS high, RST high, W25Q CS high, and PB10 controlled
+  ground is not reading high.
+- `RC522_VER=0x00` remains a communication failure before UID reading. The
+  software mapping and BSP-compatible SPI sequence are now aligned with
+  `Demo_RC522`; the remaining issue is below the RC522 driver layer, most likely
+  PB10-as-ground electrical margin, module power/orientation, or the board
+  header path to RC522 MISO/CS/SCK/MOSI/RST.

@@ -52,6 +52,15 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
+  /* PB10 is wired to RC522 GND on this board revision. Keep it low before any
+     RC522 signal pin is driven. */
+  HAL_GPIO_WritePin(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET);
+  GPIO_InitStruct.Pin = NFC_GND_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NFC_GND_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_RESET);
 
@@ -70,6 +79,9 @@ void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(NFC_NSS_GPIO_Port, NFC_NSS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(NFC_MOSI_GPIO_Port, NFC_MOSI_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(MAX9814_GAIN_GPIO_Port, MAX9814_GAIN_Pin, GPIO_PIN_RESET);
@@ -93,18 +105,19 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(NFC_RST_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : NFC_MISO_Pin */
-  GPIO_InitStruct.Pin = NFC_MISO_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(NFC_MISO_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : SPI1_CS_Pin NFC_MOSI_Pin */
-  GPIO_InitStruct.Pin = SPI1_CS_Pin|NFC_MOSI_Pin;
+  /*Configure GPIO pin : SPI1_CS_Pin */
+  GPIO_InitStruct.Pin = SPI1_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NFC_MOSI_Pin */
+  GPIO_InitStruct.Pin = NFC_MOSI_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NFC_MOSI_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : L1_Pin L2_Pin L3_Pin L4_Pin
                            L5_Pin L6_Pin L7_Pin TEMP_Pin */
@@ -115,12 +128,32 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : NFC_SCK_Pin NFC_NSS_Pin */
-  GPIO_InitStruct.Pin = NFC_SCK_Pin|NFC_NSS_Pin;
+  /*Configure GPIO pin : NFC_MISO_Pin */
+  GPIO_InitStruct.Pin = NFC_MISO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(NFC_MISO_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NFC_RST_Pin */
+  GPIO_InitStruct.Pin = NFC_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(NFC_RST_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NFC_SCK_Pin */
+  GPIO_InitStruct.Pin = NFC_SCK_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NFC_SCK_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NFC_NSS_Pin */
+  GPIO_InitStruct.Pin = NFC_NSS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NFC_NSS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : MAX9814_GAIN_Pin */
   GPIO_InitStruct.Pin = MAX9814_GAIN_Pin;

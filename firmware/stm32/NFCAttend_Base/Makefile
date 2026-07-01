@@ -33,6 +33,9 @@ OPT = -Og
 #######################################
 # Build path
 BUILD_DIR = build
+ifeq ($(RC522_ONLY_DIAG),1)
+BUILD_DIR = build_rc522_only
+endif
 
 ######################################
 # source

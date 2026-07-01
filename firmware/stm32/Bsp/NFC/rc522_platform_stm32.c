@@ -5,12 +5,13 @@
  *          使用 CubeMX 生成的 GPIO 引脚定义，通过软件模拟 SPI 与 RC522 通讯。
  *
  *          引脚连接 (默认，可在 main.h 中修改):
- *          - NFC_NSS(PB13)  -> 片选 (CS/SDA)
- *          - NFC_RST(PA2)   -> 复位 (RST)
- *          - NFC_MOSI(PC4)  -> MOSI
- *          - NFC_MISO(PA1)  -> MISO
- *          - NFC_SCK(PB11)  -> SCK
- *          - GND/+3V3       -> 模块物理供电
+ *          - NFC_GND(PB10)  -> controlled low level for RC522 GND
+ *          - NFC_NSS(PE15)  -> CS/SDA
+ *          - NFC_RST(PB15)  -> RST
+ *          - NFC_MOSI(PA0)  -> MOSI
+ *          - NFC_MISO(PB13) -> MISO
+ *          - NFC_SCK(PD9)   -> SCK
+ *          - +3V3           -> module VCC
  *
  *          使用方法:
  *          1. 在 CubeMX 中配置上述 GPIO 引脚 (输出: NSS, RST, MOSI, SCK; 输入: MISO)
@@ -32,7 +33,8 @@
 #define RC522_PIN_MOSI  0x04u
 #define RC522_PIN_MISO  0x08u
 #define RC522_PIN_RST   0x10u
-#define RC522_PIN_FLASH 0x20u
+#define RC522_PIN_GND   0x20u
+#define RC522_PIN_FLASH 0x40u
 
 /* ======================================================
  *  GPIO 控制函数 (RC522_IO_t 回调实现)
@@ -47,6 +49,13 @@ static void rc522_gpio_configure(void)
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOE_CLK_ENABLE();
+
+    HAL_GPIO_WritePin(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET);
+    GPIO_InitStruct.Pin = NFC_GND_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(NFC_GND_GPIO_Port, &GPIO_InitStruct);
 
     HAL_GPIO_WritePin(NFC_NSS_GPIO_Port, NFC_NSS_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_RESET);
@@ -223,7 +232,7 @@ void RC522_Platform_Init(void)
 
     rc522_gpio_configure();
 
-    /* 拉低 NFC_GND 引脚，为模块提供参考地 */
+    /* Keep the RC522 controlled-ground pin low before chip initialization. */
 #if defined(NFC_GND_Pin) && defined(NFC_GND_GPIO_Port)
     HAL_GPIO_WritePin(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET);
 #endif
@@ -251,6 +260,11 @@ uint8_t RC522_Platform_ReadPins(void)
     if (HAL_GPIO_ReadPin(NFC_RST_GPIO_Port, NFC_RST_Pin) == GPIO_PIN_SET) {
         pins |= RC522_PIN_RST;
     }
+#if defined(NFC_GND_Pin) && defined(NFC_GND_GPIO_Port)
+    if (HAL_GPIO_ReadPin(NFC_GND_GPIO_Port, NFC_GND_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_GND;
+    }
+#endif
 #if defined(SPI1_CS_Pin) && defined(SPI1_CS_GPIO_Port)
     if (HAL_GPIO_ReadPin(SPI1_CS_GPIO_Port, SPI1_CS_Pin) == GPIO_PIN_SET) {
         pins |= RC522_PIN_FLASH;
