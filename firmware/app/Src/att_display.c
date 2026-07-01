@@ -9,7 +9,7 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_FangSong_16;
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_24;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -22,6 +22,7 @@ typedef enum {
     ATT_DISPLAY_EVENT_DUPLICATE,
     ATT_DISPLAY_EVENT_INVALID,
     ATT_DISPLAY_EVENT_ERROR,
+    ATT_DISPLAY_EVENT_OLED_TEST,
 } att_display_event_t;
 
 typedef struct {
@@ -93,30 +94,39 @@ static void set_event(att_display_event_t event, uint32_t now_sec)
 }
 
 #if ATT_ENABLE_DISPLAY
-static const uint16_t s_hdu_codes[] = {
-    0xbabc, 0xb5e7, 0xbfc6, 0xbcbc, 0xb4f3, 0xd1a7,
-};
-static const uint16_t s_name_codes[] = {
-    0xd4f8, 0xd6dd, 0xd7d3, 0xd8b9,
-};
+/*
+ * The BSP GUI treats bytes above 0x7f as GBK-style two-byte character codes.
+ * Keep Chinese OLED diagnostics as explicit GBK bytes so source-file encoding
+ * cannot turn them into UTF-8 sequences.
+ */
+static const char s_oled_demo_gbk[] = "\xc4\xfa\xba\xc3\xa3\xa1\nOLED";
 
 static void draw_line(uint8_t row, const char *text)
 {
     GUI_DispStringAt(text, 0, (int)row * 8);
 }
 
-static void draw_gbk_codes(const uint16_t *codes, size_t count, int x, int y)
+static void draw_oled_test_screen(void)
 {
-    size_t i;
+    const GUI_FONT GUI_UNI_PTR *old_font;
 
-    for (i = 0u; i < count; i++) {
-        GUI_DispCharAt(codes[i], x + (int)i * 16, y);
-    }
+    GUI_Clear();
+    GUI_SetColor(GUI_COLOR_WHITE);
+
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_24);
+    GUI_DispStringAt(s_oled_demo_gbk, 0, 0);
+    GUI_SetFont(old_font);
+    GUI_Update();
 }
 
 static void draw_status_screen(uint32_t now_sec)
 {
     char line[32];
+
+    if (s_display.event == ATT_DISPLAY_EVENT_OLED_TEST) {
+        draw_oled_test_screen();
+        return;
+    }
 
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
@@ -263,24 +273,8 @@ void att_display_show_oled_test(void)
         return;
     }
 
-#if ATT_ENABLE_DISPLAY
-    const GUI_FONT GUI_UNI_PTR *old_font;
-
-    GUI_Clear();
-    GUI_SetColor(GUI_COLOR_WHITE);
-    draw_line(0u, "OLED FONT TEST");
-    draw_line(1u, "ASCII OK 012345");
-    draw_line(2u, "CMD:OLEDTEST");
-    draw_line(3u, "16PX GBK");
-
-    old_font = GUI_SetFont(&GUI_FontHZ_FangSong_16);
-    draw_gbk_codes(s_hdu_codes, sizeof(s_hdu_codes) / sizeof(s_hdu_codes[0]), 0, 32);
-    draw_gbk_codes(s_name_codes, sizeof(s_name_codes) / sizeof(s_name_codes[0]), 0, 48);
-    GUI_SetFont(old_font);
-    GUI_Update();
-#endif
-
-    s_display.dirty = 0u;
+    s_display.event = ATT_DISPLAY_EVENT_OLED_TEST;
+    mark_dirty();
 }
 
 void att_display_poll(uint32_t now_sec)
@@ -290,6 +284,7 @@ void att_display_poll(uint32_t now_sec)
     }
 
     if (s_display.event != ATT_DISPLAY_EVENT_READY &&
+        s_display.event != ATT_DISPLAY_EVENT_OLED_TEST &&
         (uint32_t)(now_sec - s_display.event_time_sec) >= ATT_DISPLAY_EVENT_HOLD_SEC) {
         s_display.event = ATT_DISPLAY_EVENT_READY;
         mark_dirty();

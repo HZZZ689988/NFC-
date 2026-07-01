@@ -67,6 +67,10 @@ void Error_Handler(void);
 #define K5_GPIO_Port GPIOE
 #define K6_Pin GPIO_PIN_6
 #define K6_GPIO_Port GPIOE
+#define I2C_SCL_Pin GPIO_PIN_6
+#define I2C_SCL_GPIO_Port GPIOB
+#define I2C_SDA_Pin GPIO_PIN_7
+#define I2C_SDA_GPIO_Port GPIOB
 #define NFC_MOSI_Pin GPIO_PIN_0
 #define NFC_MOSI_GPIO_Port GPIOA
 #define NFC_MISO_Pin GPIO_PIN_13

@@ -6,9 +6,6 @@
 GUI_CONTEXT GUI_Context;
 char GUI_DecChar;
 
-char* utf8_string_to_gbk_with_table(const char* utf8_str);
-char* mixed_string_to_gbk(const char* str);
-
 int LCD_GetXSize(void)        { return SSD1306_WIDTH; }
 int LCD_GetYSize(void)        { return SSD1306_HEIGHT; }
 int GUI_GetXSize(void)        { return LCD_GetXSize(); }
@@ -32,7 +29,7 @@ int GUI_Init(void) {
 	GUI_Context.PenSize = 1;
 	GUI_Context.DrawColor = GUI_COLOR_WHITE;
 	
-	SSD1306_init(); //初始化OLED
+	SSD1306_init(); //��ʼ��OLED
 	
 	return 0;
 }
@@ -51,206 +48,6 @@ const GUI_FONT GUI_UNI_PTR* GUI_GetFont(void) {
   r = GUI_Context.pAFont;
   GUI_UNLOCK();
   return r;
-}
-
-
-typedef struct {
-    int utf8_only;       int gbk_only;        int both_valid;       int utf8_invalid;     int gbk_invalid;      int ascii_count;  } EncodingStats;
-
-static int is_valid_utf8_sequence(const unsigned char* s, size_t len, size_t* consumed) {
-    *consumed = 1;
-        if (s[0] <= 0x7F) {
-        return -1;     }
-        if ((s[0] & 0x80) == 0x00) {
-        return -1;     }
-        if ((s[0] & 0xE0) == 0xC0) {
-        if (len < 2) return 0;
-        if ((s[1] & 0xC0) != 0x80) return 0;
-                unsigned int code_point = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
-        if (code_point < 0x80) return 0;
-        if (code_point > 0x7FF) return 0;
-        *consumed = 2;
-        return 1;
-    }
-        if ((s[0] & 0xF0) == 0xE0) {
-        if (len < 3) return 0;
-        if ((s[1] & 0xC0) != 0x80) return 0;
-        if ((s[2] & 0xC0) != 0x80) return 0;
-                unsigned int code_point = ((s[0] & 0x0F) << 12) | 
-                                 ((s[1] & 0x3F) << 6) | 
-                                 (s[2] & 0x3F);
-                if (code_point < 0x800) return 0;
-                if (code_point >= 0xD800 && code_point <= 0xDFFF) return 0;
-                if (code_point > 0xFFFF) return 0;
-                *consumed = 3;
-        return 1;
-    }
-        if ((s[0] & 0xF8) == 0xF0) {
-        if (len < 4) return 0;
-        if ((s[1] & 0xC0) != 0x80) return 0;
-        if ((s[2] & 0xC0) != 0x80) return 0;
-        if ((s[3] & 0xC0) != 0x80) return 0;
-                unsigned int code_point = ((s[0] & 0x07) << 18) | 
-                                 ((s[1] & 0x3F) << 12) | 
-                                 ((s[2] & 0x3F) << 6) | 
-                                 (s[3] & 0x3F);
-                if (code_point < 0x10000) return 0;
-                if (code_point > 0x10FFFF) return 0;
-                *consumed = 4;
-        return 1;
-    }
-        return 0;
-}
-
-static int is_valid_gbk_sequence(const unsigned char* s, size_t len, size_t* consumed) {
-    *consumed = 1;
-        if (s[0] <= 0x80) {
-        return -1;     }
-        if (s[0] >= 0x81 && s[0] <= 0xFE) {
-        if (len < 2) return 0;
-        unsigned char second = s[1];
-        if ((second >= 0x40 && second <= 0x7E) || 
-            (second >= 0x80 && second <= 0xFE)) {
-            *consumed = 2;
-            return 1;
-        }
-        return 0;      }
-        return 0;
-}
-
-static int get_gbk_char_frequency_score(const unsigned char* s) {
-    if (s[0] >= 0xB0 && s[0] <= 0xD7) {
-        if (s[1] >= 0xA1 && s[1] <= 0xFE) {
-            return 3;         }
-    }
-    if (s[0] >= 0xD8 && s[0] <= 0xF7) {
-        if (s[1] >= 0xA1 && s[1] <= 0xFE) {
-            return 3;         }
-    }
-        if (s[0] >= 0x81 && s[0] <= 0xA0) {
-        return 1;     }
-    if (s[0] >= 0xAA && s[0] <= 0xFE) {
-        return 1;     }
-        return 2;
-}
-
-static int get_utf8_char_frequency_score(const unsigned char* s, size_t len) {
-    if (len == 3 && (s[0] & 0xF0) == 0xE0) {
-        unsigned int code_point = ((s[0] & 0x0F) << 12) | 
-                         ((s[1] & 0x3F) << 6) | 
-                         (s[2] & 0x3F);
-                if (code_point >= 0x4E00 && code_point <= 0x9FFF) {
-            return 3;         }
-        if (code_point >= 0x3400 && code_point <= 0x4DBF) {
-            return 2;         }
-        if (code_point >= 0x3000 && code_point <= 0x303F) {
-            return 2;         }
-    }
-    return 1;
-}
-
-int detect_encoding_comprehensive(const char* str) {
-    if (!str) return -1;
-    
-    const unsigned char* s = (const unsigned char*)str;
-    size_t len = strlen((const char*)s);
-    if (len == 0) return 0;
-    
-    EncodingStats stats = {0, 0, 0, 0, 0, 0};
-    int utf8_score = 0;
-    int gbk_score = 0;
-    
-    size_t i = 0;
-    while (i < len) {
-        if (s[i] <= 0x7F) {
-            stats.ascii_count++;
-            i++;
-            continue;
-        }
-        
-        size_t utf8_consumed = 1;
-        size_t gbk_consumed = 1;
-        int is_utf8 = is_valid_utf8_sequence(s + i, len - i, &utf8_consumed);
-        int is_gbk = is_valid_gbk_sequence(s + i, len - i, &gbk_consumed);
-        
-        if (is_utf8 == 1 && is_gbk == 1) {
-                        stats.both_valid++;
-                        int utf8_freq = get_utf8_char_frequency_score(s + i, utf8_consumed);
-            int gbk_freq = get_gbk_char_frequency_score(s + i);
-            utf8_score += utf8_freq;
-            gbk_score += gbk_freq;
-                        if (utf8_consumed == 3 && gbk_consumed == 2) {
-                utf8_score += 2;             }
-            i += utf8_consumed;
-        }
-        else if (is_utf8 == 1 && is_gbk != 1) {
-                        stats.utf8_only++;
-            utf8_score += 4;             i += utf8_consumed;
-        }
-        else if (is_gbk == 1 && is_utf8 != 1) {
-                        stats.gbk_only++;
-            gbk_score += 4;             i += gbk_consumed;
-        }
-        else if (is_utf8 == 0 && is_gbk == 0) {
-                        stats.utf8_invalid++;
-            stats.gbk_invalid++;
-            i++;
-        }
-        else if (is_utf8 == 0) {
-            stats.utf8_invalid++;
-            i++;
-        }
-        else if (is_gbk == 0) {
-            stats.gbk_invalid++;
-            i++;
-        }
-        else {
-            i++;
-        }
-    }
-    
-    int non_ascii = stats.utf8_only + stats.gbk_only + stats.both_valid;
-    if (non_ascii == 0) {
-        return 0;     }
-    
-        if (stats.utf8_only > 0 && stats.gbk_invalid > stats.utf8_invalid) {
-        return 1;     }
-    if (stats.gbk_only > 0 && stats.utf8_invalid > stats.gbk_invalid) {
-        return 2;     }
-        if (stats.both_valid > 0 && stats.utf8_only == 0 && stats.gbk_only == 0) {
-                if (utf8_score > gbk_score) {
-            return 1;
-        } else if (gbk_score > utf8_score) {
-            return 2;
-        }
-                return 1;     }
-        if (stats.utf8_only > 0 && stats.gbk_only > 0) {
-                int mixed_threshold = non_ascii / 5;
-        if (stats.utf8_only > mixed_threshold && stats.gbk_only > mixed_threshold) {
-            return 3;         }
-                if (stats.utf8_only > stats.gbk_only * 2) {
-            return 1;
-        } else if (stats.gbk_only > stats.utf8_only * 2) {
-            return 2;
-        }
-                return (utf8_score > gbk_score) ? 1 : 2;
-    }
-        if (stats.utf8_only > 0) {
-        return 1;
-    }
-    if (stats.gbk_only > 0) {
-        return 2;
-    }
-        if (utf8_score > gbk_score) {
-        return 1;
-    } else if (gbk_score > utf8_score) {
-        return 2;
-    }
-    
-    return 1; }
-
-int detect_encoding_by_sequence(const char* str) {
-    return detect_encoding_comprehensive(str);
 }
 
 /*********************************************************************
@@ -413,10 +210,6 @@ void LCD_DrawBitmap1BPP(	int x0, int y0, int xsize, int ysize,
 void GUIPROP_DispChar(U16P c) {
   int BytesPerLine;
   const GUI_FONT_PROP GUI_UNI_PTR * pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
-  if (!pProp && c != '?') {
-    c = '?';
-    pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
-  }
   if (pProp) {
     const GUI_CHARINFO GUI_UNI_PTR * pCharInfo = pProp->paCharInfo+(c-pProp->First);
     BytesPerLine = pCharInfo->BytesPerLine;
@@ -429,8 +222,8 @@ void GUIPROP_DispChar(U16P c) {
       int YSize = GUI_Context.pAFont->YSize;
         SSD1306_DrawFilledRectangle(GUI_Context.DispPosX, 
                      GUI_Context.DispPosY + YSize, 
-                     pCharInfo->XSize,
-                     YDist - YSize, COLOR_B);
+                     GUI_Context.DispPosX + pCharInfo->XSize, 
+                     GUI_Context.DispPosY + YDist, COLOR_B);
     }
     GUI_Context.DispPosX += pCharInfo->XDist * GUI_Context.pAFont->XMag;
   }
@@ -442,10 +235,6 @@ void GUIPROP_DispChar(U16P c) {
 */
 int GUIPROP_GetCharDistX(U16P c) {
   const GUI_FONT_PROP GUI_UNI_PTR * pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
-  if (!pProp && c != '?') {
-    c = '?';
-    pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
-  }
   return (pProp) ? (pProp->paCharInfo+(c-pProp->First))->XSize * GUI_Context.pAFont->XMag : 0;
 }
 
@@ -596,17 +385,13 @@ char GUI_GotoXY(int x, int y) {
 
 void GUI_ClearRect(int x0, int y0, int x1, int y1) {
   GUI_LOCK();
-  if (x1 < x0 || y1 < y0) {
-    GUI_UNLOCK();
-    return;
-  }
-  SSD1306_DrawFilledRectangle(x0, y0, x1 - x0 + 1, y1 - y0 + 1, GUI_COLOR_BLACK);
+  SSD1306_DrawFilledRectangle(x0,y0,x1,y1, GUI_COLOR_BLACK);
   GUI_UNLOCK();
 }
 
 void GUI_Clear(void) {
   GUI_GotoXY(0,0);     /* Reset text cursor to upper left */
-  GUI_ClearRect(0, 0, GUI_GetXSize() - 1, GUI_GetYSize() - 1);
+  GUI_ClearRect(0, 0, GUI_GetXSize(), GUI_GetYSize());
 }
 
 void GUI_DispCEOL(void) {
@@ -809,20 +594,10 @@ void GUI_DispString(const char GUI_UNI_PTR *s) {
  /* Adjust vertical position */
   yAdjust = GUI_GetYAdjust();
   GUI_Context.DispPosY -= yAdjust;
-  char *ss = (char *)s;
-  int butf8 = detect_encoding_by_sequence(s);
-  if (butf8 == 1)
-	  ss = utf8_string_to_gbk_with_table(s);
-  else if (butf8 == 3)
-	  ss = mixed_string_to_gbk(s);
-  if (!ss) {
-	  GUI_UNLOCK();
-	  return;
-  }
-  for (; *ss; ss++) {
+  for (; *s; s++) {
     GUI_RECT r;
-    int LineNumChars = GUI__GetLineNumChars(ss, 0x7fff);
-    int xLineSize    = GUI__GetLineDistX(ss, LineNumChars);
+    int LineNumChars = GUI__GetLineNumChars(s, 0x7fff);
+    int xLineSize    = GUI__GetLineDistX(s, LineNumChars);
   /* Check if x-position needs to be changed due to h-alignment */
     switch (GUI_Context.TextAlign & GUI_TA_HORIZONTAL) { 
       case GUI_TA_CENTER: xAdjust = xLineSize / 2; break;
@@ -833,10 +608,10 @@ void GUI_DispString(const char GUI_UNI_PTR *s) {
     r.x1 = r.x0 + xLineSize - 1;    
     r.y0 = GUI_Context.DispPosY;
     r.y1 = r.y0 + FontSizeY - 1;    
-    GUI__DispLine(ss, LineNumChars, &r);
+    GUI__DispLine(s, LineNumChars, &r);
     GUI_Context.DispPosY = r.y0;
-    ss += GUI_UC__NumChars2NumBytes(ss, LineNumChars);
-    if ((*ss == '\n') || (*ss == '\r')) {
+    s += GUI_UC__NumChars2NumBytes(s, LineNumChars);
+    if ((*s == '\n') || (*s == '\r')) {
       switch (GUI_Context.TextAlign & GUI_TA_HORIZONTAL) { 
       case GUI_TA_CENTER:
       case GUI_TA_RIGHT:
@@ -846,16 +621,14 @@ void GUI_DispString(const char GUI_UNI_PTR *s) {
         GUI_Context.DispPosX = 0;
         break;
       }
-      if (*ss == '\n')
+      if (*s == '\n')
         GUI_Context.DispPosY += FontSizeY;
     } else {
       GUI_Context.DispPosX = r.x0 + xLineSize;
     }
-    if (*ss == 0)    /* end of string (last line) reached ? */
+    if (*s == 0)    /* end of string (last line) reached ? */
       break;
   }
-//  if (butf8 == 1)
-//	free(ss);
   GUI_Context.DispPosY += yAdjust;
   GUI_Context.TextAlign &= ~GUI_TA_HORIZONTAL;
   GUI_UNLOCK();
@@ -918,18 +691,7 @@ void GUI__DispStringInRect(const char GUI_UNI_PTR *s, GUI_RECT* pRect, int TextA
   GUI_RECT r;
   GUI_RECT rLine;
   int y = 0;
-
-  char *ss = (char *)s;
-  int butf8 = detect_encoding_by_sequence(s);
-  if (butf8 == 1)
-	  ss = utf8_string_to_gbk_with_table(s);
-  else if (butf8 == 3)
-	  ss = mixed_string_to_gbk(s);
-  if (!ss) {
-	  GUI_UNLOCK();
-	  return;
-  }
-  const char GUI_UNI_PTR *sOrg =ss;
+  const char GUI_UNI_PTR *sOrg =s;
   int FontYSize;
   int xLine = 0;
   int LineLen;
@@ -947,10 +709,10 @@ void GUI__DispStringInRect(const char GUI_UNI_PTR *s, GUI_RECT* pRect, int TextA
     int NumLines;
     /* Count the number of lines */
     for (NumCharsRem = MaxNumChars, NumLines = 1; NumCharsRem ;NumLines++) {
-      LineLen = GUI__GetLineNumChars(ss, NumCharsRem);
+      LineLen = GUI__GetLineNumChars(s, NumCharsRem);
       NumCharsRem -= LineLen;
-      ss += GUI_UC__NumChars2NumBytes(ss, LineLen);
-      if (GUI__HandleEOLine((const char **)&ss))
+      s += GUI_UC__NumChars2NumBytes(s, LineLen);
+      if (GUI__HandleEOLine(&s))
         break;
     }
     /* Do the vertical alignment */
@@ -965,11 +727,11 @@ void GUI__DispStringInRect(const char GUI_UNI_PTR *s, GUI_RECT* pRect, int TextA
 	  }
   }
   /* Output string */
-  for (NumCharsRem = MaxNumChars, ss = (char *)sOrg; NumCharsRem;) {
+  for (NumCharsRem = MaxNumChars, s = sOrg; NumCharsRem;) {
     int xLineSize;
-    LineLen = GUI__GetLineNumChars(ss, NumCharsRem);
+    LineLen = GUI__GetLineNumChars(s, NumCharsRem);
     NumCharsRem -= LineLen;
-    xLineSize = GUI__GetLineDistX(ss, LineLen);
+    xLineSize = GUI__GetLineDistX(s, LineLen);
     switch (TextAlign & GUI_TA_HORIZONTAL) {
     case GUI_TA_HCENTER:
       xLine = r.x0+(r.x1-r.x0-xLineSize)/2; break;
@@ -982,14 +744,12 @@ void GUI__DispStringInRect(const char GUI_UNI_PTR *s, GUI_RECT* pRect, int TextA
     rLine.x1 = rLine.x0 + xLineSize-1;
     rLine.y0 = GUI_Context.DispPosY = y;
     rLine.y1 = y + FontYSize-1;
-    GUI__DispLine(ss, LineLen, &rLine);
-    ss += GUI_UC__NumChars2NumBytes(ss, LineLen);
+    GUI__DispLine(s, LineLen, &rLine);
+    s += GUI_UC__NumChars2NumBytes(s, LineLen);
     y += GUI_GetFontDistY();
-    if (GUI__HandleEOLine((const char **)&ss))
+    if (GUI__HandleEOLine(&s))
       break;
   }
-//  if (butf8 == 1)
-//	free(ss);
 }
 
 #define MIN(v0,v1) ((v0>v1) ? v1 : v0)
@@ -1033,23 +793,13 @@ void GUI_DispStringInRect(const char GUI_UNI_PTR *s, GUI_RECT* pRect, int TextAl
 void GUI_DispStringLen(const char GUI_UNI_PTR *s, int MaxNumChars) {
   U16 Char;
   GUI_LOCK();
-  char *ss = (char *)s;
-  int butf8 = detect_encoding_by_sequence(s);
-  if (butf8 == 1)
-	  ss = utf8_string_to_gbk_with_table(s);
-  else if (butf8 == 3)
-	  ss = mixed_string_to_gbk(s);
-  if (!ss)
-	  return;
-  while (MaxNumChars && ((Char = GUI_UC__GetCharCodeInc((const char **)&ss)) != 0)) {
+  while (MaxNumChars && ((Char = GUI_UC__GetCharCodeInc(&s)) != 0)) {
     GUI_DispChar(Char);
     MaxNumChars--;
   }
   while (MaxNumChars--) {
     GUI_DispChar(' ');
   }
-//  if (butf8 == 1)
-//	free(ss);
   GUI_UNLOCK();
 }
 /*********************************************************************
@@ -1063,16 +813,8 @@ void GUI_GetTextExtend(GUI_RECT* pRect, const char GUI_UNI_PTR * s, int MaxNumCh
   U16 Char;
   pRect->x0 = GUI_Context.DispPosX;
   pRect->y0 = GUI_Context.DispPosY;
-  char *ss = (char *)s;
-  int butf8 = detect_encoding_by_sequence(s);
-  if (butf8 == 1)
-	  ss = utf8_string_to_gbk_with_table(s);
-  else if (butf8 == 3)
-	  ss = mixed_string_to_gbk(s);
-  if (!ss)
-	  return;
   while (MaxNumChars--) {
-    Char = GUI_UC__GetCharCodeInc((const char **)&ss);
+    Char = GUI_UC__GetCharCodeInc(&s);
     if ((Char == '\n') || (Char == 0)) {
       if (LineSizeX > xMax) {
         xMax = LineSizeX;
@@ -1094,8 +836,6 @@ void GUI_GetTextExtend(GUI_RECT* pRect, const char GUI_UNI_PTR * s, int MaxNumCh
   }
   pRect->x1 = pRect->x0 + xMax - 1;
   pRect->y1 = pRect->y0 + GUI_Context.pAFont->YSize * NumLines - 1;
-//  if (butf8 == 1)
-//	free(ss);
 }
 
 int GUI_GetDispPosX(void) {
@@ -1125,18 +865,7 @@ int GUI__strlen(const char GUI_UNI_PTR * s) {
 }
 
 int GUI_GetStringDistX(const char GUI_UNI_PTR * s) {
-  char *ss = (char *)s;
-  int butf8 = detect_encoding_by_sequence(s);
-  if (butf8 == 1)
-	  ss = utf8_string_to_gbk_with_table(s);
-  else if (butf8 == 3)
-	  ss = mixed_string_to_gbk(s);
-  if (!ss)
-	  return 0;
-  int len = GUI__GetLineDistX(ss, GUI__strlen(ss));
-//  if (butf8 == 1)
-//	free(ss);
-  return len;
+  return GUI__GetLineDistX(s, GUI__strlen(s));
 }
 
 void GUI_GetFontInfo(const GUI_FONT GUI_UNI_PTR * pFont, GUI_FONTINFO * pFontInfo) {
@@ -1450,219 +1179,6 @@ GUI_COLOR GUI_GetColor(void) {
   r = GUI_Context.DrawColor;
   GUI_UNLOCK();
   return r;
-}
-
-char* utf8_string_to_gbk_with_table(const char* utf8_str) {
-		static char output_buf[1024] = {0};
-    if (!utf8_str) return NULL;
-
-    size_t input_len = strlen(utf8_str);
-    if (input_len > 256)
-        return NULL;
-    
-    char* out_ptr = output_buf;
-    const unsigned char* in = (const unsigned char*)utf8_str;
-    size_t i = 0;
-
-    size_t map_size = GUI_Context.pAFont->gbkMapCnt;
-    const Utf8ToGbkMap* pMap = GUI_Context.pAFont->pfUtf2GBKMap;
-    
-    while (i < input_len) {
-        unsigned char c = in[i];
-
-        // ASCII 字符（0x00 ~ 0x7F）
-        if (c <= 0x7F) {
-            *out_ptr++ = c;
-            i++;
-        }
-        // 多字节 UTF-8 字符
-        else {
-            size_t utf8_len = 0;
-            // 判断 UTF-8 字符长度
-            if ((c & 0xE0) == 0xC0) utf8_len = 2;
-            else if ((c & 0xF0) == 0xE0) utf8_len = 3;
-            else if ((c & 0xF8) == 0xF0) utf8_len = 4;
-            else {
-                // 非法 UTF-8，跳过或报错
-                i++;
-                continue;
-            }
-
-            if (i + utf8_len > input_len) {
-                // 不完整字符，跳过
-                break;
-            }
-
-            // 使用二分查找在映射表中查找
-            int found = 0;
-            int left = 0;
-            int right = map_size - 1;
-            
-            while (left <= right) {
-                int mid = left + (right - left) / 2;
-                
-                // 首先比较长度，如果长度不同，可以直接判断大小关系
-                if (pMap[mid].utf8_len < utf8_len) {
-                    // 如果当前项的utf8长度小于目标长度，说明目标在右侧
-                    left = mid + 1;
-                } 
-                else if (pMap[mid].utf8_len > utf8_len) {
-                    // 如果当前项的utf8长度大于目标长度，说明目标在左侧
-                    right = mid - 1;
-                }
-                else {
-                    // 长度相同，比较UTF-8编码内容
-                    int cmp = memcmp(pMap[mid].utf8, &in[i], utf8_len);
-                    
-                    if (cmp < 0) {
-                        // 当前项小于目标，目标在右侧
-                        left = mid + 1;
-                    }
-                    else if (cmp > 0) {
-                        // 当前项大于目标，目标在左侧
-                        right = mid - 1;
-                    }
-                    else {
-                        // 找到匹配项
-                        memcpy(out_ptr, pMap[mid].gbk, pMap[mid].gbk_len);
-                        out_ptr += pMap[mid].gbk_len;
-                        found = 1;
-                        break;
-                    }
-                }
-            }
-
-            if (!found) {
-                // 未在表中，可选择跳过、替换为 '?'，或报错
-                *out_ptr++ = '?'; // 简单处理
-            }
-
-            i += utf8_len;
-        }
-    }
-
-    *out_ptr = '\0';
-    return output_buf;
-}
-
-char* mixed_string_to_gbk(const char* str) {
-    static char output_buf[1024] = {0};
-    if (!str) return NULL;
-
-    size_t input_len = strlen(str);
-    if (input_len > 512)
-        return NULL;
-    
-    char* out_ptr = output_buf;
-    const unsigned char* in = (const unsigned char*)str;
-    size_t i = 0;
-
-    size_t map_size = GUI_Context.pAFont->gbkMapCnt;
-    const Utf8ToGbkMap* pMap = GUI_Context.pAFont->pfUtf2GBKMap;
-    
-    while (i < input_len) {
-        unsigned char c = in[i];
-
-        if (c <= 0x7F) {
-            *out_ptr++ = c;
-            i++;
-            continue;
-        }
-        
-        size_t utf8_consumed = 1;
-        size_t gbk_consumed = 1;
-        int is_utf8 = is_valid_utf8_sequence(in + i, input_len - i, &utf8_consumed);
-        int is_gbk = is_valid_gbk_sequence(in + i, input_len - i, &gbk_consumed);
-        
-        if (is_utf8 == 1 && is_gbk != 1) {
-                        size_t utf8_len = utf8_consumed;
-            int found = 0;
-            int left = 0;
-            int right = map_size - 1;
-            
-            while (left <= right) {
-                int mid = left + (right - left) / 2;
-                
-                if (pMap[mid].utf8_len < utf8_len) {
-                    left = mid + 1;
-                } 
-                else if (pMap[mid].utf8_len > utf8_len) {
-                    right = mid - 1;
-                }
-                else {
-                    int cmp = memcmp(pMap[mid].utf8, &in[i], utf8_len);
-                    
-                    if (cmp < 0) {
-                        left = mid + 1;
-                    }
-                    else if (cmp > 0) {
-                        right = mid - 1;
-                    }
-                    else {
-                        memcpy(out_ptr, pMap[mid].gbk, pMap[mid].gbk_len);
-                        out_ptr += pMap[mid].gbk_len;
-                        found = 1;
-                        break;
-                    }
-                }
-            }
-            
-            if (!found) {
-                *out_ptr++ = '?';
-            }
-            i += utf8_len;
-        }
-        else if (is_gbk == 1 && is_utf8 != 1) {
-                        *out_ptr++ = in[i];
-            *out_ptr++ = in[i + 1];
-            i += 2;
-        }
-        else if (is_utf8 == 1 && is_gbk == 1) {
-                        size_t utf8_len = utf8_consumed;
-            int found = 0;
-            int left = 0;
-            int right = map_size - 1;
-            
-            while (left <= right) {
-                int mid = left + (right - left) / 2;
-                
-                if (pMap[mid].utf8_len < utf8_len) {
-                    left = mid + 1;
-                } 
-                else if (pMap[mid].utf8_len > utf8_len) {
-                    right = mid - 1;
-                }
-                else {
-                    int cmp = memcmp(pMap[mid].utf8, &in[i], utf8_len);
-                    
-                    if (cmp < 0) {
-                        left = mid + 1;
-                    }
-                    else if (cmp > 0) {
-                        right = mid - 1;
-                    }
-                    else {
-                        memcpy(out_ptr, pMap[mid].gbk, pMap[mid].gbk_len);
-                        out_ptr += pMap[mid].gbk_len;
-                        found = 1;
-                        break;
-                    }
-                }
-            }
-            
-            if (!found) {
-                *out_ptr++ = '?';
-            }
-            i += utf8_len;
-        }
-        else {
-                        *out_ptr++ = '?';
-            i++;
-        }
-    }
-
-    *out_ptr = '\0';
-    return output_buf;
 }
 
 /*************************** End of file ****************************/

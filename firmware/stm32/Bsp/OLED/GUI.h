@@ -185,13 +185,6 @@ typedef struct {
   tGL_DispLine*               pfDispLine;
 } tGUI_ENC_APIList;
 
-typedef struct {
-	unsigned char utf8[4];   // 最多 4 字节 UTF-8
-	U8 utf8_len;             // 实际长度
-	unsigned char gbk[2];    // GBK 最多 2 字节（GB2312 是其子集）
-	U8 gbk_len;
-} Utf8ToGbkMap;
-
 #define DECLARE_FONT(Type)                                     \
 void GUI##Type##_DispChar    (U16P c);                         \
 int  GUI##Type##_GetCharDistX(U16P c);                         \
@@ -229,17 +222,12 @@ struct GUI_FONT {
 	U8 d1;
 	U8 d2;
 	U8 d3;
-	const Utf8ToGbkMap* pfUtf2GBKMap;
-	U32 gbkMapCnt;
 };
 
 
 #ifndef GUI_FLASH 
 #define GUI_FLASH 
 #endif 
-
-#define S_W 128
-#define S_H 64
 
 extern GUI_FLASH const GUI_FONT GUI_Font8_ASCII;
 
@@ -298,7 +286,7 @@ void      GUI_SetColor     (GUI_COLOR);
 */
 
 void  GUI_DispCEOL (void);
-//void  GUI_DispChar  (U16 c);
+void  GUI_DispChar  (U16 c);
 //void  GUI_DispChars (U16 c, int Cnt);
 void  GUI_DispCharAt(U16 c, I16P x, I16P y);
 void  GUI_DispString         (const char GUI_UNI_PTR *s);
@@ -323,7 +311,7 @@ int   GUI_GetYSizeOfFont(const GUI_FONT GUI_UNI_PTR * pFont);
 int   GUI_GetYDistOfFont(const GUI_FONT GUI_UNI_PTR * pFont);
 int   GUI_GetTextAlign(void);
 //int   GUI_GetTextMode(void);
-//char  GUI_IsInFont(const GUI_FONT GUI_UNI_PTR * pFont, U16 c);
+char  GUI_IsInFont(const GUI_FONT GUI_UNI_PTR * pFont, U16 c);
 int   GUI_SetTextAlign(int Align);
 //int   GUI_SetTextMode(int Mode);
 //char  GUI_SetTextStyle(char Style);
@@ -333,7 +321,6 @@ char  GUI_GotoXY(int x, int y);
 char  GUI_GotoX(int x);
 char  GUI_GotoY(int y);
 void  GUI_DispNextLine(void);
-void SetSSDTrans(unsigned char btran);
 
 #define GUI_Delay HAL_Delay 
 #define GUI_GetTime HAL_GetTick 

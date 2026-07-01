@@ -480,3 +480,34 @@ ESP01S network ready
 
 The 16px font firmware is now running on the board. The physical display should
 be checked for whether the larger font resolves the missing-stroke issue.
+
+## OLED Demo-Compatible GBK Path
+
+The official EX07 OLED demo was flashed and its Chinese text displayed normally.
+After porting the same OLED driver stack into the attendance firmware, the most
+stable test path is:
+
+```c
+GUI_SetFont(&GUI_FontHZ_SimSun_24);
+GUI_DispStringAt("\xc4\xfa\xba\xc3\xa3\xa1\nOLED", 0, 0);
+```
+
+This byte string is GBK for `您好！`. It is intentionally written as escaped
+bytes, not as UTF-8 source text, because the BSP GUI parser combines bytes above
+`0x7f` into GBK-style two-byte character codes. Passing UTF-8 Chinese source
+strings makes the parser read the wrong code points and produces mojibake.
+
+Board feedback after this change: the characters are broadly normal. This
+matches the software analysis:
+
+- OLED hardware, software I2C, SSD1306 refresh and the GUI string path are
+  working.
+- The bundled `SimSun_24.c` is only a demo subset. It contains ASCII plus
+  `您好！杭州电子科技大学曾毓子`, not a full Chinese font.
+- Chinese outside that subset will still render as missing/incorrect glyphs
+  unless a matching GBK font subset is generated and linked.
+
+Current decision: keep the production status page in ASCII for now, and use
+`OLEDTEST` as a known-good Chinese diagnostic. Full Chinese business pages
+should be enabled only after generating a GBK font subset that covers the actual
+attendance UI words.

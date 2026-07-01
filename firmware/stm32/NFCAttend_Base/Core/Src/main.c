@@ -122,7 +122,6 @@ int main(void)
   MX_DMA_Init();
   /* PA1 is used by the RC522 header as MISO on this board. */
   MX_DAC_Init();
-  MX_I2C1_Init();
   MX_RTC_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
