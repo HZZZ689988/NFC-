@@ -53,6 +53,7 @@ void att_display_show_error(const char *reason, uint32_t now_sec)
     (void)reason;
     (void)now_sec;
 }
+void att_display_show_oled_test(void) {}
 void att_display_poll(uint32_t now_sec) { (void)now_sec; }
 '''
 

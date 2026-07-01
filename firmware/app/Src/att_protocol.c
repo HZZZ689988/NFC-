@@ -7,6 +7,7 @@
 
 #include "att_card.h"
 #include "att_crc16.h"
+#include "att_display.h"
 #include "att_storage.h"
 
 static att_protocol_config_apply_fn s_config_apply;
@@ -453,6 +454,12 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
                  diag.tag_type[0],
                  diag.tag_type[1]);
         send(response, ctx);
+        return ATT_OK;
+    }
+
+    if (strcmp(payload, "OLEDTEST") == 0) {
+        att_display_show_oled_test();
+        send("OK:OLEDTEST\n", ctx);
         return ATT_OK;
     }
 

@@ -815,8 +815,10 @@ void GUI_DispString(const char GUI_UNI_PTR *s) {
 	  ss = utf8_string_to_gbk_with_table(s);
   else if (butf8 == 3)
 	  ss = mixed_string_to_gbk(s);
-  if (!ss)
+  if (!ss) {
+	  GUI_UNLOCK();
 	  return;
+  }
   for (; *ss; ss++) {
     GUI_RECT r;
     int LineNumChars = GUI__GetLineNumChars(ss, 0x7fff);
@@ -923,8 +925,10 @@ void GUI__DispStringInRect(const char GUI_UNI_PTR *s, GUI_RECT* pRect, int TextA
 	  ss = utf8_string_to_gbk_with_table(s);
   else if (butf8 == 3)
 	  ss = mixed_string_to_gbk(s);
-  if (!ss)
+  if (!ss) {
+	  GUI_UNLOCK();
 	  return;
+  }
   const char GUI_UNI_PTR *sOrg =ss;
   int FontYSize;
   int xLine = 0;

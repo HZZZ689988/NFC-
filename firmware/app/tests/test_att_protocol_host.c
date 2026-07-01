@@ -27,6 +27,7 @@ static uint8_t g_last_image_index;
 static uint8_t g_last_image_block[16];
 static unsigned g_image_calls;
 static unsigned g_update_image_calls;
+static unsigned g_oled_test_calls;
 static att_device_config_t g_config;
 static unsigned g_save_config_calls;
 static unsigned g_apply_config_calls;
@@ -81,6 +82,7 @@ static void reset_mocks(void)
     memset(g_last_image_block, 0, sizeof(g_last_image_block));
     g_image_calls = 0u;
     g_update_image_calls = 0u;
+    g_oled_test_calls = 0u;
     memset(&g_config, 0, sizeof(g_config));
     g_config.device_id = 1u;
     g_config.work_mode = ATT_MODE_IN_OUT;
@@ -253,6 +255,18 @@ static void test_diag_query_maps_driver_error(void)
     require_int(strcmp(capture.text, "ERR:DIAG\n") == 0, "DIAG? should map diagnostic error");
 }
 
+static void test_oled_test_command_triggers_display(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("OLEDTEST", capture_send, &capture);
+
+    require_int(status == ATT_OK, "OLEDTEST should return ATT_OK");
+    require_int(strcmp(capture.text, "OK:OLEDTEST\n") == 0, "OLEDTEST should acknowledge command");
+    require_int(g_oled_test_calls == 1u, "OLEDTEST should trigger display test");
+}
+
 static void test_config_set_saves_and_applies_config(void)
 {
     reset_mocks();
@@ -325,6 +339,7 @@ int main(void)
     test_config_query_returns_persisted_config();
     test_diag_query_returns_rc522_registers();
     test_diag_query_maps_driver_error();
+    test_oled_test_command_triggers_display();
     test_config_set_saves_and_applies_config();
     test_config_set_rejects_bad_value();
     test_image_block_command_calls_card_writer();
@@ -403,6 +418,11 @@ att_status_t att_card_finish_image_update(void)
 {
     g_update_image_calls++;
     return ATT_OK;
+}
+
+void att_display_show_oled_test(void)
+{
+    g_oled_test_calls++;
 }
 
 att_status_t att_storage_init(void)

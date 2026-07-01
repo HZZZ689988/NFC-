@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "att_display.h"
+#include "GUI.h"
 
 typedef struct {
     int row;
@@ -12,6 +13,14 @@ typedef struct {
 static gui_line_t g_lines[16];
 static unsigned g_line_count;
 static unsigned g_update_count;
+
+struct GUI_FONT {
+    int dummy;
+};
+
+static const GUI_FONT g_default_font = {0};
+static const GUI_FONT *g_current_font = &g_default_font;
+const GUI_FONT GUI_FontHZ_SimSun_12 = {0};
 
 static void require_int(int condition, const char *message)
 {
@@ -50,6 +59,15 @@ void GUI_DispStringAt(const char *text, int x, int y)
         snprintf(g_lines[g_line_count].text, sizeof(g_lines[g_line_count].text), "%s", text);
         g_line_count++;
     }
+}
+
+const GUI_FONT *GUI_SetFont(const GUI_FONT *font)
+{
+    const GUI_FONT *old_font = g_current_font;
+    if (font != NULL) {
+        g_current_font = font;
+    }
+    return old_font;
 }
 
 void GUI_Update(void)
@@ -100,8 +118,28 @@ static void test_display_draws_ready_then_releases_event(void)
     require_int(strcmp(line_at(5), "READY 16s") == 0, "event page should release after timeout");
 }
 
+static void test_display_draws_oled_ascii_pattern(void)
+{
+    static const char gbk_hdu[] =
+        "GBK:\xBA\xBC\xB5\xE7\xBF\xC6\xBC\xBC\xB4\xF3\xD1\xA7";
+    static const char gbk_name[] =
+        "\xD4\xF8\xD6\xDD\xD7\xD3\xD8\xB9";
+
+    require_int(att_display_init() == ATT_OK, "display init should succeed");
+
+    att_display_show_oled_test();
+
+    require_int(strcmp(line_at(0), "OLED ASCII TEST") == 0, "OLED test should show title");
+    require_int(strcmp(line_at(1), "ABCDEFGHIJKLMNO") == 0, "OLED test should show first alphabet row");
+    require_int(strcmp(line_at(2), "PQRSTUVWXYZ0123") == 0, "OLED test should show second alphabet row");
+    require_int(strcmp(line_at(3), "456789 !?:+-/") == 0, "OLED test should show punctuation row");
+    require_int(strcmp(line_at(5), gbk_hdu) == 0, "OLED test should show GBK SimSun row");
+    require_int(strcmp(line_at(6), gbk_name) == 0, "OLED test should show second GBK row");
+}
+
 int main(void)
 {
     test_display_draws_ready_then_releases_event();
+    test_display_draws_oled_ascii_pattern();
     return 0;
 }

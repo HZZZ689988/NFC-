@@ -9,6 +9,7 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_12;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -92,6 +93,11 @@ static void set_event(att_display_event_t event, uint32_t now_sec)
 }
 
 #if ATT_ENABLE_DISPLAY
+static const char s_gbk_hdu[] =
+    "GBK:\xBA\xBC\xB5\xE7\xBF\xC6\xBC\xBC\xB4\xF3\xD1\xA7";
+static const char s_gbk_name[] =
+    "\xD4\xF8\xD6\xDD\xD7\xD3\xD8\xB9";
+
 static void draw_line(uint8_t row, const char *text)
 {
     GUI_DispStringAt(text, 0, (int)row * 8);
@@ -238,6 +244,32 @@ void att_display_show_error(const char *reason, uint32_t now_sec)
 {
     copy_text(s_display.message, sizeof(s_display.message), reason);
     set_event(ATT_DISPLAY_EVENT_ERROR, now_sec);
+}
+
+void att_display_show_oled_test(void)
+{
+    if (s_display.initialized == 0u) {
+        return;
+    }
+
+#if ATT_ENABLE_DISPLAY
+    const GUI_FONT GUI_UNI_PTR *old_font;
+
+    GUI_Clear();
+    GUI_SetColor(GUI_COLOR_WHITE);
+    draw_line(0u, "OLED ASCII TEST");
+    draw_line(1u, "ABCDEFGHIJKLMNO");
+    draw_line(2u, "PQRSTUVWXYZ0123");
+    draw_line(3u, "456789 !?:+-/");
+
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_12);
+    GUI_DispStringAt(s_gbk_hdu, 0, 40);
+    GUI_DispStringAt(s_gbk_name, 0, 52);
+    GUI_SetFont(old_font);
+    GUI_Update();
+#endif
+
+    s_display.dirty = 0u;
 }
 
 void att_display_poll(uint32_t now_sec)
