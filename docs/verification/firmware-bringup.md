@@ -1,8 +1,8 @@
 ---
 type: verification
 target: firmware
-hardware-validated: no
-updated: 2026-06-30
+hardware-validated: partial
+updated: 2026-07-01
 ---
 
 # Firmware Bring-Up Checklist
@@ -58,8 +58,8 @@ updated: 2026-06-30
 ## Hardware
 
 - [ ] W25Q128 ID reads as `0xEF17`.
-- [ ] LittleFS formats and mounts on the board.
-- [ ] `config.bin` defaults are created on the board.
+- [x] LittleFS formats and mounts on the board.
+- [x] `config.bin` defaults are created on the board.
 - [ ] `records.bin` append/read passes CRC16.
 - [ ] RC522 reads UID.
 - [ ] `ISSUE` rejects no-card.
@@ -70,7 +70,7 @@ updated: 2026-06-30
 - [ ] `IMGA00..23`, `IMGN00..09`, `IMGD00..09` write to a real image card and `UPDATEIMG` returns success.
 - [ ] `UPDATEIMG` returns `ERR:NOT_READY` when any image block is missing.
 - [ ] Image-card block contents can be read back from RC522 and match upper-computer generated bitmap data.
-- [ ] USART1 responds to `PING` and `CFG?`.
+- [x] USART1 responds to `PING` and `CFG?`.
 - [ ] USART1 accepts segmented `CFG:` writes and persists `/config.bin` on W25Q128/LittleFS.
 - [ ] `CFG:` WiFi/server/weather/timezone changes are reflected in ESP01S startup behavior after config write.
 - [ ] USART1 `LIST:N` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
