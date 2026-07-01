@@ -413,6 +413,10 @@ void LCD_DrawBitmap1BPP(	int x0, int y0, int xsize, int ysize,
 void GUIPROP_DispChar(U16P c) {
   int BytesPerLine;
   const GUI_FONT_PROP GUI_UNI_PTR * pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
+  if (!pProp && c != '?') {
+    c = '?';
+    pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
+  }
   if (pProp) {
     const GUI_CHARINFO GUI_UNI_PTR * pCharInfo = pProp->paCharInfo+(c-pProp->First);
     BytesPerLine = pCharInfo->BytesPerLine;
@@ -425,8 +429,8 @@ void GUIPROP_DispChar(U16P c) {
       int YSize = GUI_Context.pAFont->YSize;
         SSD1306_DrawFilledRectangle(GUI_Context.DispPosX, 
                      GUI_Context.DispPosY + YSize, 
-                     GUI_Context.DispPosX + pCharInfo->XSize, 
-                     GUI_Context.DispPosY + YDist, COLOR_B);
+                     pCharInfo->XSize,
+                     YDist - YSize, COLOR_B);
     }
     GUI_Context.DispPosX += pCharInfo->XDist * GUI_Context.pAFont->XMag;
   }
@@ -438,6 +442,10 @@ void GUIPROP_DispChar(U16P c) {
 */
 int GUIPROP_GetCharDistX(U16P c) {
   const GUI_FONT_PROP GUI_UNI_PTR * pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
+  if (!pProp && c != '?') {
+    c = '?';
+    pProp = GUIPROP_FindChar(GUI_Context.pAFont->p.pProp, c);
+  }
   return (pProp) ? (pProp->paCharInfo+(c-pProp->First))->XSize * GUI_Context.pAFont->XMag : 0;
 }
 
@@ -588,13 +596,17 @@ char GUI_GotoXY(int x, int y) {
 
 void GUI_ClearRect(int x0, int y0, int x1, int y1) {
   GUI_LOCK();
-  SSD1306_DrawFilledRectangle(x0,y0,x1,y1, GUI_COLOR_BLACK);
+  if (x1 < x0 || y1 < y0) {
+    GUI_UNLOCK();
+    return;
+  }
+  SSD1306_DrawFilledRectangle(x0, y0, x1 - x0 + 1, y1 - y0 + 1, GUI_COLOR_BLACK);
   GUI_UNLOCK();
 }
 
 void GUI_Clear(void) {
   GUI_GotoXY(0,0);     /* Reset text cursor to upper left */
-  GUI_ClearRect(0, 0, GUI_GetXSize(), GUI_GetYSize());
+  GUI_ClearRect(0, 0, GUI_GetXSize() - 1, GUI_GetYSize() - 1);
 }
 
 void GUI_DispCEOL(void) {
@@ -1117,7 +1129,7 @@ int GUI_GetStringDistX(const char GUI_UNI_PTR * s) {
 	  ss = mixed_string_to_gbk(s);
   if (!ss)
 	  return 0;
-  int len = GUI__GetLineDistX(s, GUI__strlen(ss));
+  int len = GUI__GetLineDistX(ss, GUI__strlen(ss));
 //  if (butf8 == 1)
 //	free(ss);
   return len;

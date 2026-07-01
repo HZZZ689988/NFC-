@@ -26,6 +26,19 @@
  */
 #define OLED_I2C_HARD
 
+/*
+ * Most 0.96-inch 128x64 I2C OLED modules used with this board are SSD1306.
+ * Runtime display-RAM readback is unreliable on many SSD1306 modules, so keep
+ * auto-detection disabled unless a SH1106 panel is explicitly fitted.
+ */
+#ifndef OLED_CONTROLLER_SH1106
+#define OLED_CONTROLLER_SH1106 0
+#endif
+
+#ifndef OLED_RUNTIME_DETECT
+#define OLED_RUNTIME_DETECT 0
+#endif
+
 /* ==================== 命令/数据定义 ==================== */
 
 /** @brief I2C命令控制字节 */

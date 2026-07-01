@@ -49,7 +49,7 @@ typedef enum {
 } OLED_ChipTypeDef;
 
 /** @brief 当前识别到的芯片类型 */
-OLED_ChipTypeDef OLED_ChipType = CHIP_UNKNOWN;
+OLED_ChipTypeDef OLED_ChipType = OLED_CONTROLLER_SH1106 ? CHIP_SH1106 : CHIP_SSD1306;
 
 /* ==================== 私有结构体 ==================== */
 
@@ -224,6 +224,7 @@ uint8_t OLED_DetectChip(void)
  */
 void OLED_SelfDetect(void)
 {
+#if OLED_RUNTIME_DETECT
     osDelay(50);
 
     if (OLED_DetectChip()) {
@@ -231,6 +232,9 @@ void OLED_SelfDetect(void)
     } else {
         OLED_ChipType = CHIP_SSD1306;
     }
+#else
+    OLED_ChipType = OLED_CONTROLLER_SH1106 ? CHIP_SH1106 : CHIP_SSD1306;
+#endif
 }
 
 /* ==================== 基本操作函数 ==================== */
@@ -325,13 +329,21 @@ void SSD1306_init(void)
     SSD1306_WriteByte(seg_com[1], OLED_CMD);
 
     SSD1306_WriteByte(0x81, OLED_CMD);
-    SSD1306_WriteByte(200, OLED_CMD);
+    SSD1306_WriteByte(0xCF, OLED_CMD);
 
     SSD1306_WriteByte(0xA4, OLED_CMD);
     SSD1306_WriteByte(0xA6, OLED_CMD);
 
-    SSD1306_WriteByte(0x20, OLED_CMD);
-    SSD1306_WriteByte(0x02, OLED_CMD);
+    if (OLED_ChipType == CHIP_SSD1306) {
+        SSD1306_WriteByte(0x20, OLED_CMD);
+        SSD1306_WriteByte(0x02, OLED_CMD);
+        SSD1306_WriteByte(0x21, OLED_CMD);
+        SSD1306_WriteByte(0x00, OLED_CMD);
+        SSD1306_WriteByte(0x7F, OLED_CMD);
+        SSD1306_WriteByte(0x22, OLED_CMD);
+        SSD1306_WriteByte(0x00, OLED_CMD);
+        SSD1306_WriteByte(0x07, OLED_CMD);
+    }
 
     SSD1306_WriteByte(0xDA, OLED_CMD);
     SSD1306_WriteByte(0x12, OLED_CMD);
@@ -345,9 +357,11 @@ void SSD1306_init(void)
     SSD1306_WriteByte(0x8D, OLED_CMD);
     SSD1306_WriteByte(0x14, OLED_CMD);
 
-    SSD1306_WriteByte(0xAD, OLED_CMD);
-    SSD1306_WriteByte(0x8B, OLED_CMD);
-    SSD1306_WriteByte(0x33, OLED_CMD);
+    if (OLED_ChipType == CHIP_SH1106) {
+        SSD1306_WriteByte(0xAD, OLED_CMD);
+        SSD1306_WriteByte(0x8B, OLED_CMD);
+        SSD1306_WriteByte(0x33, OLED_CMD);
+    }
 
     SSD1306_Fill(GUI_COLOR_BLACK);
     SSD1306_UpdateScreen();
@@ -372,8 +386,8 @@ void SSD1306_UpdateScreen(void)
     for (m = 0; m < 8; m++)
     {
         SSD1306_WriteByte(0xb0 + m, OLED_CMD);
-        SSD1306_WriteByte(st, OLED_CMD);
-        SSD1306_WriteByte(0x10, OLED_CMD);
+        SSD1306_WriteByte((uint8_t)(st & 0x0F), OLED_CMD);
+        SSD1306_WriteByte((uint8_t)(0x10 | ((st >> 4) & 0x0F)), OLED_CMD);
         SSD1306_WriteMuliByte((uint8_t *)&SSD1306_Buffer[128 * m], 128, OLED_DATA);
     }
 }
@@ -566,21 +580,21 @@ void SSD1306_DrawRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, GUI_C
  */
 void SSD1306_DrawFilledRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, GUI_COLOR c)
 {
-    uint8_t i;
+    uint16_t i;
 
-    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT) {
+    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT || w == 0u || h == 0u) {
         return;
     }
 
-    if ((x + w) >= SSD1306_WIDTH) {
+    if ((x + w) > SSD1306_WIDTH) {
         w = SSD1306_WIDTH - x;
     }
-    if ((y + h) >= SSD1306_HEIGHT) {
+    if ((y + h) > SSD1306_HEIGHT) {
         h = SSD1306_HEIGHT - y;
     }
 
-    for (i = 0; i <= h; i++) {
-        SSD1306_DrawLine(x, y + i, x + w, y + i, c);
+    for (i = 0; i < h; i++) {
+        SSD1306_DrawLine(x, y + i, x + w - 1u, y + i, c);
     }
 }
 
