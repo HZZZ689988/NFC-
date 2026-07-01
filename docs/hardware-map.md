@@ -26,6 +26,11 @@ Use one complete RC522 header column. Do not mix pins between the two columns.
 The firmware is configured for column A, using the header order
 `3.3V/GND/RST/MISO/MOSI/SCK/NSS/extra`.
 
+If the RC522 module silkscreen is ordered from the opposite end as
+`NSS/SCK/MOSI/MISO/RST/GND/3.3V`, connect by signal name, not by the same
+physical order. With column A this means the RC522 signal side maps to
+`PB13/PB11/PC4/PA1/PA2/GND/3.3V`.
+
 | RC522 module pin | Column A STM32 pin/header label |
 | --- | --- |
 | `3.3V` | `3.3V` |
@@ -44,6 +49,11 @@ land on `NC` with the same header ordering. Its extra label is `RM11`.
 Column A shares `PC4` with the existing W25Q128 chip-select label in the base
 project. Treat the real board validation of RC522 plus W25Q128 as required
 before marking hardware complete.
+
+The current board-side RC522 diagnostic returned `RC522_VER=0x00`, so the UID
+read path is not validated yet. That result points to RC522 power/orientation,
+RST/NSS/SCK/MOSI/MISO wiring, or the `PC4` hardware conflict, not to a missing
+card alone.
 
 Do not power the RC522 from 5 V.
 

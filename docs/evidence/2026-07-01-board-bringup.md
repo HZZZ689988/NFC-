@@ -150,3 +150,43 @@ Still not covered:
 
 - A real attendance `UPLOAD:` record and `ACK:UPLOAD:<seq>` round trip.
 - Weather query/cache, because no weather API key was configured.
+
+## RC522 Diagnostic Follow-Up
+
+Firmware was rebuilt with the `DIAG?` command and downloaded again with
+OpenOCD. Download and verify passed:
+
+```text
+** Programming Finished **
+** Verify Started **
+** Verified OK **
+** Resetting Target **
+```
+
+After reset, ESP01S still reached the network:
+
+```text
+[ESP01S] NTP授时成功(UDP): 2026-07-01 19:49:57
+[ESP01S] RTC已校准: 2026-07-01 19:50:03
+RTC synced from ESP01S NTP
+ESP01S network ready
+```
+
+CRC-framed checks over `COM3`:
+
+| Command payload | Sent frame | Response |
+| --- | --- | --- |
+| `PING` | `$PING*6427\n` | `OK:PONG\n` |
+| `DIAG?` | `$DIAG?*6DF3\n` | `DIAG:RC522_VER=0x00|TX=0x00|ERR=0x00|REQ=-1|TAG=0000\n` |
+| `READ` | `$READ*DC73\n` | `ERR:NO_CARD\n` |
+
+The same `DIAG?` and `READ` sequence was repeated and returned the same result.
+
+Result:
+
+- `COM3` protocol dispatch is still working.
+- The RC522 diagnostic command is available on the board.
+- `RC522_VER=0x00` and `TX=0x00` mean the MCU is not communicating with the
+  RC522 chip on the configured pins.
+- The result does not validate UID reading. It points to RC522 power/orientation,
+  RST/NSS/SCK/MOSI/MISO wiring, or the known `PC4` conflict with W25Q128 CS.

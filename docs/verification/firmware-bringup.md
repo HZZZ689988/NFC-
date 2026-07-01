@@ -54,6 +54,7 @@ updated: 2026-07-01
 - [x] `python firmware/app/tests/test_run_host_tests_py.py` covers host runner command generation, including MSVC object output placement.
 - [x] `python tools/run_verification.py` runs Python compile checks, upper-computer/server tests, native C host tests and `git diff --check`.
 - [x] `python tools/run_verification.py --firmware-build` additionally runs STM32 clean build and ELF segment permission checks.
+- [x] `DIAG?` protocol routing is host-tested for RC522 register diagnostic output.
 
 ## Hardware
 
@@ -61,6 +62,8 @@ updated: 2026-07-01
 - [x] LittleFS formats and mounts on the board.
 - [x] `config.bin` defaults are created on the board.
 - [ ] `records.bin` append/read passes CRC16.
+- [x] RC522 diagnostic command runs over `COM3`.
+- [ ] RC522 register read returns a valid MFRC522 version value.
 - [ ] RC522 reads UID.
 - [ ] `ISSUE` rejects no-card.
 - [ ] `ISSUE` rejects mismatched UID.
