@@ -9,7 +9,7 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_8;
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_12;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -110,7 +110,7 @@ static void draw_gbk_codes(const uint16_t *codes, size_t count, int x, int y)
     size_t i;
 
     for (i = 0u; i < count; i++) {
-        GUI_DispCharAt(codes[i], x + (int)i * 12, y);
+        GUI_DispCharAt(codes[i], x + (int)i * 16, y);
     }
 }
 
@@ -268,15 +268,14 @@ void att_display_show_oled_test(void)
 
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
-    draw_line(0u, "OLED ASCII TEST");
-    draw_line(1u, "ABCDEFGHIJKLMNO");
-    draw_line(2u, "PQRSTUVWXYZ0123");
-    draw_line(3u, "456789 !?:+-/");
+    draw_line(0u, "OLED FONT TEST");
+    draw_line(1u, "ASCII OK 012345");
+    draw_line(2u, "CMD:OLEDTEST");
 
-    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_8);
-    GUI_DispStringAt("GBK:", 0, 40);
-    draw_gbk_codes(s_hdu_codes, sizeof(s_hdu_codes) / sizeof(s_hdu_codes[0]), 28, 40);
-    draw_gbk_codes(s_name_codes, sizeof(s_name_codes) / sizeof(s_name_codes[0]), 28, 52);
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_12);
+    GUI_DispStringAt("12PX GBK", 0, 28);
+    draw_gbk_codes(s_hdu_codes, sizeof(s_hdu_codes) / sizeof(s_hdu_codes[0]), 0, 40);
+    draw_gbk_codes(s_name_codes, sizeof(s_name_codes) / sizeof(s_name_codes[0]), 0, 52);
     GUI_SetFont(old_font);
     GUI_Update();
 #endif

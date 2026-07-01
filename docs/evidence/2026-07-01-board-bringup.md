@@ -381,3 +381,50 @@ Interpretation:
   `Demo_RC522`; the remaining issue is below the RC522 driver layer, most likely
   PB10-as-ground electrical margin, module power/orientation, or the board
   header path to RC522 MISO/CS/SCK/MOSI/RST.
+
+## OLED 12px GBK Font Test
+
+The OLED Chinese diagnostic was changed to use the generated `SimSun_12.c`
+subset instead of the full `SimSun_8.c` font:
+
+- The firmware now links `../Bsp/OLED/SimSun_12.c`.
+- `OLEDTEST` draws ASCII reference text first, then switches to
+  `GUI_FontHZ_SimSun_12`.
+- Chinese glyphs are drawn by direct GBK character codes, not by passing
+  UTF-8 source strings through the uncertain conversion path.
+- Chinese spacing was increased to 16 pixels per character.
+
+Expected OLED test content after sending `OLEDTEST`:
+
+```text
+OLED FONT TEST
+ASCII OK 012345
+CMD:OLEDTEST
+12PX GBK
+杭电科技大学
+曾州子毓
+```
+
+Build/download commands used:
+
+```text
+python firmware\app\tests\run_host_tests.py
+make -j4
+openocd.exe -f .\openocd.cfg -c "adapter speed 1000" -c "program build/Demo_W25Q128.elf verify reset exit"
+```
+
+Results:
+
+```text
+Host tests: passed
+Firmware build: passed, text=102536 data=496 bss=46496
+OpenOCD: Programming Finished, Verified OK, Resetting Target
+COM3 startup: Attendance app ready, ESP01S network ready
+OLEDTEST -> OK:OLEDTEST
+```
+
+The generated 12px GBK dot matrix was also parsed locally for the test codes
+`babc b5e7 bfc6 bcbc b4f3 d1a7 d4f8 d6dd d7d3 d8b9`; the glyph bitmaps contain
+recognizable stroke structures. If the physical OLED still shows unreadable
+Chinese after this firmware, the next focus should be OLED bit order/scan
+orientation or the generated font export settings, not the serial command path.

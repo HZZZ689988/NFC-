@@ -28,7 +28,7 @@ struct GUI_FONT {
 
 static const GUI_FONT g_default_font = {0};
 static const GUI_FONT *g_current_font = &g_default_font;
-const GUI_FONT GUI_FontHZ_SimSun_8 = {0};
+const GUI_FONT GUI_FontHZ_SimSun_12 = {0};
 
 static void require_int(int condition, const char *message)
 {
@@ -149,17 +149,16 @@ static void test_display_draws_oled_ascii_pattern(void)
 
     att_display_show_oled_test();
 
-    require_int(strcmp(line_at(0), "OLED ASCII TEST") == 0, "OLED test should show title");
-    require_int(strcmp(line_at(1), "ABCDEFGHIJKLMNO") == 0, "OLED test should show first alphabet row");
-    require_int(strcmp(line_at(2), "PQRSTUVWXYZ0123") == 0, "OLED test should show second alphabet row");
-    require_int(strcmp(line_at(3), "456789 !?:+-/") == 0, "OLED test should show punctuation row");
-    require_int(strcmp(line_at(5), "GBK:") == 0, "OLED test should show GBK label");
+    require_int(strcmp(line_at(0), "OLED FONT TEST") == 0, "OLED test should show title");
+    require_int(strcmp(line_at(1), "ASCII OK 012345") == 0, "OLED test should show ASCII reference row");
+    require_int(strcmp(line_at(2), "CMD:OLEDTEST") == 0, "OLED test should show command reference");
+    require_int(strcmp(line_at(3), "12PX GBK") == 0, "OLED test should show GBK label");
     require_int(g_char_count == (sizeof(expected_codes) / sizeof(expected_codes[0])),
                 "OLED test should draw all GBK characters directly");
     for (unsigned i = 0u; i < sizeof(expected_codes) / sizeof(expected_codes[0]); i++) {
         require_int(g_chars[i].code == expected_codes[i], "OLED test should draw expected GBK code");
     }
-    require_int(g_chars[0].x == 28 && g_chars[1].x == 40,
+    require_int(g_chars[0].x == 0 && g_chars[1].x == 16,
                 "OLED test should draw GBK characters with wider spacing");
     require_int(g_chars[5].y == 40 && g_chars[6].y == 52,
                 "OLED test should place GBK rows apart");
