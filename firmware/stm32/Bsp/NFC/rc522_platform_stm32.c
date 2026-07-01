@@ -21,14 +21,62 @@
  */
 
 #include "rc522.h"
+#include "board_spi_bus.h"
 #include "delay_us.h"   /* 公共微秒延时服务 */
 #include "FreeRTOS.h"   /* FreeRTOS 基础头文件，须在 task.h 之前 */
 #include "task.h"       /* taskENTER_CRITICAL / taskEXIT_CRITICAL */
 #include "main.h"       /* 包含 NFC_XXX_Pin/GPIO_Port 定义 */
 
+#define RC522_PIN_NSS   0x01u
+#define RC522_PIN_SCK   0x02u
+#define RC522_PIN_MOSI  0x04u
+#define RC522_PIN_MISO  0x08u
+#define RC522_PIN_RST   0x10u
+#define RC522_PIN_FLASH 0x20u
+
 /* ======================================================
  *  GPIO 控制函数 (RC522_IO_t 回调实现)
  * ====================================================== */
+
+static void rc522_gpio_configure(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+
+    HAL_GPIO_WritePin(NFC_NSS_GPIO_Port, NFC_NSS_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(NFC_SCK_GPIO_Port, NFC_SCK_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(NFC_MOSI_GPIO_Port, NFC_MOSI_Pin, GPIO_PIN_SET);
+#if defined(SPI1_CS_Pin) && defined(SPI1_CS_GPIO_Port)
+    HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
+#endif
+
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+
+    GPIO_InitStruct.Pin = NFC_NSS_Pin;
+    HAL_GPIO_Init(NFC_NSS_GPIO_Port, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = NFC_RST_Pin;
+    HAL_GPIO_Init(NFC_RST_GPIO_Port, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = NFC_SCK_Pin;
+    HAL_GPIO_Init(NFC_SCK_GPIO_Port, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = NFC_MOSI_Pin;
+    HAL_GPIO_Init(NFC_MOSI_GPIO_Port, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = NFC_MISO_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(NFC_MISO_GPIO_Port, &GPIO_InitStruct);
+}
 
 /**
  * @brief RC522 片选 (CS/NSS) 控制
@@ -38,7 +86,14 @@ static void cs_control(uint8_t level)
 {
     if (level) {
         HAL_GPIO_WritePin(NFC_NSS_GPIO_Port, NFC_NSS_Pin, GPIO_PIN_SET);
+#if defined(SPI1_CS_Pin) && defined(SPI1_CS_GPIO_Port)
+        if ((NFC_MOSI_GPIO_Port == SPI1_CS_GPIO_Port) && (NFC_MOSI_Pin == SPI1_CS_Pin)) {
+            HAL_GPIO_WritePin(NFC_MOSI_GPIO_Port, NFC_MOSI_Pin, GPIO_PIN_SET);
+        }
+#endif
+        BoardSpiBus_Unlock();
     } else {
+        BoardSpiBus_Lock();
         HAL_GPIO_WritePin(NFC_NSS_GPIO_Port, NFC_NSS_Pin, GPIO_PIN_RESET);
     }
 }
@@ -161,6 +216,8 @@ void RC522_Platform_Init(void)
     /* 初始化公共微秒延时服务 */
     delay_us_init();
 
+    rc522_gpio_configure();
+
     /* 拉低 NFC_GND 引脚，为模块提供参考地 */
 #if defined(NFC_GND_Pin) && defined(NFC_GND_GPIO_Port)
     HAL_GPIO_WritePin(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET);
@@ -168,4 +225,41 @@ void RC522_Platform_Init(void)
 
     /* 初始化 RC522 芯片 (传递平台 IO 接口) */
     RC522_Init((RC522_IO_t *)&s_rc522_io);
+}
+
+uint8_t RC522_Platform_ReadPins(void)
+{
+    uint8_t pins = 0u;
+
+    if (HAL_GPIO_ReadPin(NFC_NSS_GPIO_Port, NFC_NSS_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_NSS;
+    }
+    if (HAL_GPIO_ReadPin(NFC_SCK_GPIO_Port, NFC_SCK_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_SCK;
+    }
+    if (HAL_GPIO_ReadPin(NFC_MOSI_GPIO_Port, NFC_MOSI_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_MOSI;
+    }
+    if (HAL_GPIO_ReadPin(NFC_MISO_GPIO_Port, NFC_MISO_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_MISO;
+    }
+    if (HAL_GPIO_ReadPin(NFC_RST_GPIO_Port, NFC_RST_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_RST;
+    }
+#if defined(SPI1_CS_Pin) && defined(SPI1_CS_GPIO_Port)
+    if (HAL_GPIO_ReadPin(SPI1_CS_GPIO_Port, SPI1_CS_Pin) == GPIO_PIN_SET) {
+        pins |= RC522_PIN_FLASH;
+    }
+#endif
+
+    return pins;
+}
+
+uint8_t RC522_Platform_MosiSharesFlashCs(void)
+{
+#if defined(SPI1_CS_Pin) && defined(SPI1_CS_GPIO_Port)
+    return (uint8_t)((NFC_MOSI_GPIO_Port == SPI1_CS_GPIO_Port) && (NFC_MOSI_Pin == SPI1_CS_Pin));
+#else
+    return 0u;
+#endif
 }

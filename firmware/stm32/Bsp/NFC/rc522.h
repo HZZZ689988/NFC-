@@ -365,6 +365,8 @@ char RC522_WriteAllSectors(uint8_t data[64][16]);
  *        和 MX_GPIO_Init() 等系统初始化已完成。
  */
 void RC522_Platform_Init(void);
+uint8_t RC522_Platform_ReadPins(void);
+uint8_t RC522_Platform_MosiSharesFlashCs(void);
 
 #ifdef __cplusplus
 }

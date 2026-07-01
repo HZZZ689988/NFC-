@@ -47,7 +47,7 @@ Expected replies:
 
 ```text
 UID:A1B2C3D4
-DIAG:RC522_VER=0x92|TX=0x03|ERR=0x00|REQ=-2|TAG=0400
+DIAG:RC522_RAW=0x92|RC522_VER=0x92|CMD=0x00|IRQ=0x01|FIFO=0x00|TX=0x03|ERR=0x00|PINS=0x3D|SHARE=1|REQ=-2|TAG=0400
 OK
 OK:ISSUE
 OK:IMG
@@ -66,8 +66,12 @@ OK:CFG
 
 `DIAG?` reads RC522 diagnostic registers without modifying card data. A healthy
 MFRC522 clone normally reports `RC522_VER=0x91` or `0x92`, and `TX` should have
-the lower antenna bits set after initialization. `RC522_VER=0x00` or `0xFF`
-means the MCU is not communicating with the RC522 over the configured wiring.
+the lower antenna bits set after initialization. `RC522_RAW` is read before ISO
+configuration, while `RC522_VER` is read after it. `PINS` is a GPIO snapshot:
+bit0 `NSS`, bit1 `SCK`, bit2 `MOSI`, bit3 `MISO`, bit4 `RST`, bit5 W25Q128
+`CS`. `SHARE=1` means the selected RC522 MOSI pin is also the W25Q128 chip
+select pin on this board. `RC522_VER=0x00` or `0xFF` means the MCU is not
+communicating with the RC522 over the configured wiring.
 
 `LIST:N` returns the newest `N` records. `LIST:ALL` returns every stored record in storage order. Bad list counts return `ERR:ARG` without sending a partial list.
 

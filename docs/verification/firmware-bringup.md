@@ -63,6 +63,8 @@ updated: 2026-07-01
 - [x] `config.bin` defaults are created on the board.
 - [ ] `records.bin` append/read passes CRC16.
 - [x] RC522 diagnostic command runs over `COM3`.
+- [x] Compare current RC522 driver against `BSP.rar` / `Demo_RC522`.
+- [x] RC522 platform init reconfigures the selected RC522 GPIOs after peripheral init.
 - [ ] RC522 register read returns a valid MFRC522 version value.
 - [ ] RC522 reads UID.
 - [ ] `ISSUE` rejects no-card.

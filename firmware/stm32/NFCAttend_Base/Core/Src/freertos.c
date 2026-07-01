@@ -561,6 +561,11 @@ void StartNfcTask(void *argument)
   /* USER CODE BEGIN StartNfcTask */
   (void)argument;
 
+  while (attendanceAppReady == 0u)
+  {
+    osDelay(100u);
+  }
+
   for (;;)
   {
     attendance_app_poll_nfc();

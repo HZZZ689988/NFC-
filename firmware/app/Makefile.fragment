@@ -9,6 +9,7 @@ C_SOURCES += \
 ../../app/Src/att_protocol.c \
 ../../app/Src/att_storage.c \
 ../../app/Src/attendance_app.c \
+../Bsp/NFC/board_spi_bus.c \
 ../../third_party/littlefs/lfs.c \
 ../../third_party/littlefs/lfs_util.c
 

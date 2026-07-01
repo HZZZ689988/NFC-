@@ -1,6 +1,7 @@
 #ifndef __W25QXX_H
 #define __W25QXX_H
 #include "main.h"
+#include "board_spi_bus.h"
 
 //W25X系列/Q系列芯片列表	   
 //W25Q80  ID  0XEF13
@@ -26,8 +27,8 @@
 extern uint16_t W25QXX_TYPE;					//定义W25QXX芯片型号		   
 
 //#define	W25QXX_CS 		PCout(4)  		//W25QXX的片选信号
-#define W25QXX_CS0		HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET)
-#define W25QXX_CS1		HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET)
+#define W25QXX_CS0		do { BoardSpiBus_Lock(); HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET); } while (0)
+#define W25QXX_CS1		do { HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET); BoardSpiBus_Unlock(); } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////// 
 //指令表

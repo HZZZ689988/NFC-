@@ -41,6 +41,7 @@ C_SOURCES =  \
 ../Bsp/Key/key.c \
 ../Bsp/LED/led.c \
 ../Bsp/MIDI/midi.c \
+../Bsp/NFC/board_spi_bus.c \
 ../Bsp/NFC/rc522.c \
 ../Bsp/NFC/rc522_platform_stm32.c \
 ../Bsp/delay/delay_us.c \

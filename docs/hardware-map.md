@@ -50,6 +50,22 @@ Column A shares `PC4` with the existing W25Q128 chip-select label in the base
 project. Treat the real board validation of RC522 plus W25Q128 as required
 before marking hardware complete.
 
+Current known-good firmware assumptions:
+
+```text
+RC522 NSS/SDA/CS -> PB13
+RC522 SCK        -> PB11
+RC522 MOSI       -> PC4
+RC522 MISO       -> PA1
+RC522 RST        -> PA2
+RC522 GND        -> GND
+RC522 3.3V       -> 3.3V
+```
+
+Do not move only one or two signal wires to column B. If the module must use
+the second column, the firmware pin map and the physical module orientation must
+be redesigned together because column B does not expose the same seven signals.
+
 The current board-side RC522 diagnostic returned `RC522_VER=0x00`, so the UID
 read path is not validated yet. That result points to RC522 power/orientation,
 RST/NSS/SCK/MOSI/MISO wiring, or the `PC4` hardware conflict, not to a missing

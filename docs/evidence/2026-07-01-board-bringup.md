@@ -190,3 +190,102 @@ Result:
   RC522 chip on the configured pins.
 - The result does not validate UID reading. It points to RC522 power/orientation,
   RST/NSS/SCK/MOSI/MISO wiring, or the known `PC4` conflict with W25Q128 CS.
+
+## BSP Demo_RC522 Comparison
+
+Source material:
+
+- Local archive: `D:\c_work\BSP.rar`
+- Extracted files checked under: `D:\c_work\_tmp_bsp_demo`
+- Board reference: `https://gitee.com/zalileo/HX32F4-Board`
+
+The archive contains `Demo_RC522` plus shared BSP files:
+
+- `Bsp/NFC/rc522.c`
+- `Bsp/NFC/rc522.h`
+- `Bsp/NFC/rc522_platform_stm32.c`
+- `Demo_RC522/Core/Src/freertos.c`
+- `Demo_RC522/Core/Src/gpio.c`
+- `Demo_RC522/Core/Inc/main.h`
+
+Demo flow:
+
+```text
+UartDrv_Init(USART1)
+RC522_Platform_Init()
+RC522_ConfigISOType('A')
+loop every 500 ms:
+  RC522_ScanCard()
+  RC522_ReadAllSectors()
+```
+
+Demo RC522 pin map:
+
+```text
+NSS  -> PE15
+RST  -> PB15
+MOSI -> PA0
+MISO -> PB13
+SCK  -> PD9
+GND  -> PB10 software-controlled low output
+```
+
+Current attendance firmware pin map is intentionally different because the
+actual board uses the Ethernet expansion header column:
+
+```text
+NSS  -> PB13
+SCK  -> PB11
+MOSI -> PC4
+MISO -> PA1
+RST  -> PA2
+GND  -> GND
+3.3V -> 3.3V
+```
+
+Software differences checked:
+
+- Register read/write format matches Demo_RC522:
+  `write = (addr << 1) & 0x7E`, `read = ((addr << 1) & 0x7E) | 0x80`.
+- Reset and ISO14443A configuration sequence matches Demo_RC522.
+- Software SPI is the same Mode 0 style: SCK idle low, MOSI set before SCK high,
+  MISO sampled while SCK is high.
+- Current firmware now explicitly reconfigures RC522 GPIOs inside
+  `RC522_Platform_Init()` so PA1/MISO cannot remain in ADC analog mode.
+- Current firmware serializes RC522 and W25Q128 access with `BoardSpiBus`.
+- Current firmware reports extra diagnostics: raw version register, configured
+  version register, command/IRQ/FIFO/TX/error registers, GPIO pin snapshot and
+  `PC4` sharing status.
+
+Latest flashed diagnostic after these changes:
+
+```text
+PING -> OK:PONG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+DIAG? -> DIAG:RC522_RAW=0x00|RC522_VER=0x00|CMD=0x00|IRQ=0x00|FIFO=0x00|TX=0x00|ERR=0x00|PINS=0x35|SHARE=1|REQ=-1|TAG=0000
+READ -> ERR:NO_CARD
+```
+
+The same image was rebuilt, downloaded by board DAP/CMSIS-DAP, verified, reset
+and tested again from `COM3` after adding the shared-bus guard:
+
+```text
+PING -> OK:PONG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+DIAG? -> DIAG:RC522_RAW=0x00|RC522_VER=0x00|CMD=0x00|IRQ=0x00|FIFO=0x00|TX=0x00|ERR=0x00|PINS=0x35|SHARE=1|REQ=-1|TAG=0000
+READ -> ERR:NO_CARD
+```
+
+Interpretation:
+
+- `PINS=0x35` means NSS high, SCK low, MOSI high, RST high and W25Q CS high;
+  MISO is read low.
+- `SHARE=1` confirms `PC4` is both RC522 MOSI and W25Q128 CS on this board.
+- `RC522_RAW=0x00` before ISO configuration and `RC522_VER=0x00` after ISO
+  configuration mean the MCU still receives all zero bits from RC522 SPI reads.
+- With the Demo_RC522 SPI logic matched, the remaining failure is below the
+  high-level driver flow: RC522 is not driving the configured MISO path, not
+  selected/reset as expected, not powered/oriented as expected, or the selected
+  board header mapping does not reach the RC522 module pins.
+- The board DAP exposes both SWD download/debug and `COM3`; OpenOCD programming
+  and serial command validation can run over the same Type-C connection.

@@ -1,5 +1,6 @@
 #include "att_lfs_port.h"
 
+#include "board_spi_bus.h"
 #include "w25qxx.h"
 
 #define ATT_FLASH_BLOCK_SIZE      4096u
@@ -17,7 +18,9 @@ static int lfs_w25q_read(const struct lfs_config *cfg, lfs_block_t block,
                          lfs_off_t off, void *buffer, lfs_size_t size)
 {
     (void)cfg;
+    BoardSpiBus_Lock();
     W25QXX_Read((uint8_t *)buffer, block * ATT_FLASH_BLOCK_SIZE + off, size);
+    BoardSpiBus_Unlock();
     return 0;
 }
 
@@ -25,23 +28,29 @@ static int lfs_w25q_prog(const struct lfs_config *cfg, lfs_block_t block,
                          lfs_off_t off, const void *buffer, lfs_size_t size)
 {
     (void)cfg;
+    BoardSpiBus_Lock();
     W25QXX_Write_NoCheck((uint8_t *)buffer, block * ATT_FLASH_BLOCK_SIZE + off, size);
     W25QXX_Wait_Busy();
+    BoardSpiBus_Unlock();
     return 0;
 }
 
 static int lfs_w25q_erase(const struct lfs_config *cfg, lfs_block_t block)
 {
     (void)cfg;
+    BoardSpiBus_Lock();
     W25QXX_Erase_Sector(block);
     W25QXX_Wait_Busy();
+    BoardSpiBus_Unlock();
     return 0;
 }
 
 static int lfs_w25q_sync(const struct lfs_config *cfg)
 {
     (void)cfg;
+    BoardSpiBus_Lock();
     W25QXX_Wait_Busy();
+    BoardSpiBus_Unlock();
     return 0;
 }
 

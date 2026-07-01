@@ -58,9 +58,15 @@ static void reset_mocks(void)
     g_read_uid_status = ATT_OK;
     g_diag_status = ATT_OK;
     memset(&g_diag, 0, sizeof(g_diag));
+    g_diag.version_raw = 0x92u;
     g_diag.version = 0x92u;
+    g_diag.command = 0x00u;
+    g_diag.com_irq = 0x01u;
+    g_diag.fifo_level = 0x00u;
     g_diag.tx_control = 0x03u;
     g_diag.error = 0x00u;
+    g_diag.pins = 0x3Du;
+    g_diag.shared_mosi_flash_cs = 1u;
     g_diag.request_status = -2;
     g_diag.tag_type[0] = 0x04u;
     g_diag.tag_type[1] = 0x00u;
@@ -231,7 +237,7 @@ static void test_diag_query_returns_rc522_registers(void)
 
     require_int(status == ATT_OK, "DIAG? should return ATT_OK");
     require_int(strcmp(capture.text,
-                       "DIAG:RC522_VER=0x92|TX=0x03|ERR=0x00|REQ=-2|TAG=0400\n") == 0,
+                       "DIAG:RC522_RAW=0x92|RC522_VER=0x92|CMD=0x00|IRQ=0x01|FIFO=0x00|TX=0x03|ERR=0x00|PINS=0x3D|SHARE=1|REQ=-2|TAG=0400\n") == 0,
                 "DIAG? should return RC522 diagnostic fields");
 }
 

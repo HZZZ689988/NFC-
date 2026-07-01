@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "att_crc16.h"
+#include "board_spi_bus.h"
 #include "rc522.h"
 
 #define ATT_CARD_ACCOUNT_SECTOR      0u
@@ -19,6 +20,16 @@ static uint8_t s_image_session_active;
 static uint32_t s_portrait_mask;
 static uint16_t s_name_mask;
 static uint16_t s_department_mask;
+
+static void card_lock(void)
+{
+    BoardSpiBus_Lock();
+}
+
+static void card_unlock(void)
+{
+    BoardSpiBus_Unlock();
+}
 
 static void reset_image_session(void)
 {
@@ -130,7 +141,9 @@ static att_status_t ensure_image_session(const att_person_t *person)
 
 att_status_t att_card_init(void)
 {
+    card_lock();
     RC522_Platform_Init();
+    card_unlock();
     return ATT_OK;
 }
 
@@ -141,11 +154,24 @@ att_status_t att_card_diag(att_card_diag_t *diag)
     }
 
     memset(diag, 0, sizeof(*diag));
+    card_lock();
+    diag->version_raw = RC522_ReadRegister(RC522_REG_VERSION);
+    diag->command = RC522_ReadRegister(RC522_REG_COMMAND);
+    diag->com_irq = RC522_ReadRegister(RC522_REG_COMIRQ);
+    diag->fifo_level = RC522_ReadRegister(RC522_REG_FIFOLEVEL);
+    diag->tx_control = RC522_ReadRegister(RC522_REG_TXCONTROL);
+    diag->error = RC522_ReadRegister(RC522_REG_ERROR);
+    diag->pins = RC522_Platform_ReadPins();
+    diag->shared_mosi_flash_cs = RC522_Platform_MosiSharesFlashCs();
     RC522_ConfigISOType('A');
     diag->version = RC522_ReadRegister(RC522_REG_VERSION);
+    diag->command = RC522_ReadRegister(RC522_REG_COMMAND);
+    diag->com_irq = RC522_ReadRegister(RC522_REG_COMIRQ);
+    diag->fifo_level = RC522_ReadRegister(RC522_REG_FIFOLEVEL);
     diag->tx_control = RC522_ReadRegister(RC522_REG_TXCONTROL);
     diag->error = RC522_ReadRegister(RC522_REG_ERROR);
     diag->request_status = (int8_t)RC522_Request(RC522_PICC_REQALL, diag->tag_type);
+    card_unlock();
     return ATT_OK;
 }
 
@@ -163,10 +189,12 @@ static att_status_t read_uid_selected(att_uid_t *uid)
 
 att_status_t att_card_read_uid(att_uid_t *uid)
 {
+    card_lock();
     att_status_t status = read_uid_selected(uid);
     if (status != ATT_ERR_NO_CARD) {
         RC522_Halt();
     }
+    card_unlock();
     return status;
 }
 
@@ -211,10 +239,12 @@ static att_status_t read_person_selected(att_person_t *person)
 
 att_status_t att_card_read_person(att_person_t *person)
 {
+    card_lock();
     att_status_t status = read_person_selected(person);
     if (status != ATT_ERR_NO_CARD) {
         RC522_Halt();
     }
+    card_unlock();
     return status;
 }
 
@@ -224,19 +254,23 @@ att_status_t att_card_issue_checked(const att_person_t *person)
         return ATT_ERR_INVALID_ARG;
     }
 
+    card_lock();
     att_uid_t current_uid;
     att_status_t status = read_uid_selected(&current_uid);
     if (status != ATT_OK) {
+        card_unlock();
         return status;
     }
 
     if (memcmp(current_uid.bytes, person->uid.bytes, ATT_UID_LEN) != 0) {
         RC522_Halt();
+        card_unlock();
         return ATT_ERR_CID_MISMATCH;
     }
 
     if (auth_sector(ATT_CARD_ACCOUNT_SECTOR, &current_uid) != ATT_OK) {
         RC522_Halt();
+        card_unlock();
         return ATT_ERR;
     }
 
@@ -255,6 +289,7 @@ att_status_t att_card_issue_checked(const att_person_t *person)
     if (write_status == ATT_OK) {
         reset_image_session();
     }
+    card_unlock();
     return write_status;
 }
 
@@ -264,19 +299,23 @@ att_status_t att_card_clear_checked(const att_uid_t *expected_uid)
         return ATT_ERR_INVALID_ARG;
     }
 
+    card_lock();
     att_uid_t current_uid;
     att_status_t status = read_uid_selected(&current_uid);
     if (status != ATT_OK) {
+        card_unlock();
         return status;
     }
 
     if (memcmp(current_uid.bytes, expected_uid->bytes, ATT_UID_LEN) != 0) {
         RC522_Halt();
+        card_unlock();
         return ATT_ERR_CID_MISMATCH;
     }
 
     if (auth_sector(ATT_CARD_ACCOUNT_SECTOR, &current_uid) != ATT_OK) {
         RC522_Halt();
+        card_unlock();
         return ATT_ERR;
     }
 
@@ -287,6 +326,7 @@ att_status_t att_card_clear_checked(const att_uid_t *expected_uid)
     if (write_status == ATT_OK) {
         reset_image_session();
     }
+    card_unlock();
     return write_status;
 }
 
@@ -296,10 +336,12 @@ att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t inde
         return ATT_ERR_INVALID_ARG;
     }
 
+    card_lock();
     uint8_t sector = 0u;
     uint8_t block = 0u;
     att_status_t status = image_block_location(area, index, &sector, &block);
     if (status != ATT_OK) {
+        card_unlock();
         return status;
     }
 
@@ -309,17 +351,20 @@ att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t inde
         if (status != ATT_ERR_NO_CARD) {
             RC522_Halt();
         }
+        card_unlock();
         return status;
     }
     status = ensure_image_session(&person);
     if (status != ATT_OK) {
         RC522_Halt();
+        card_unlock();
         return status;
     }
 
     status = auth_sector(sector, &person.uid);
     if (status != ATT_OK) {
         RC522_Halt();
+        card_unlock();
         return status;
     }
 
@@ -327,11 +372,13 @@ att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t inde
     memcpy(block_data, data, sizeof(block_data));
     if (RC522_WriteBlock(sector, block, block_data) != RC522_OK) {
         RC522_Halt();
+        card_unlock();
         return ATT_ERR;
     }
 
     RC522_Halt();
     mark_image_block(area, index);
+    card_unlock();
     return ATT_OK;
 }
 
@@ -341,17 +388,20 @@ att_status_t att_card_finish_image_update(void)
         return ATT_ERR_NOT_READY;
     }
 
+    card_lock();
     att_person_t person;
     att_status_t status = read_person_selected(&person);
     if (status != ATT_OK) {
         if (status != ATT_ERR_NO_CARD) {
             RC522_Halt();
         }
+        card_unlock();
         return status;
     }
     status = ensure_image_session(&person);
     if (status != ATT_OK) {
         RC522_Halt();
+        card_unlock();
         return status;
     }
 
@@ -359,10 +409,12 @@ att_status_t att_card_finish_image_update(void)
         s_name_mask != ATT_CARD_TEXT_DONE_MASK ||
         s_department_mask != ATT_CARD_TEXT_DONE_MASK) {
         RC522_Halt();
+        card_unlock();
         return ATT_ERR_NOT_READY;
     }
 
     RC522_Halt();
     reset_image_session();
+    card_unlock();
     return ATT_OK;
 }

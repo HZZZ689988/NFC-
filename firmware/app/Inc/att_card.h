@@ -20,9 +20,15 @@ typedef enum {
 } att_card_image_area_t;
 
 typedef struct {
+    uint8_t version_raw;
     uint8_t version;
+    uint8_t command;
+    uint8_t com_irq;
+    uint8_t fifo_level;
     uint8_t tx_control;
     uint8_t error;
+    uint8_t pins;
+    uint8_t shared_mosi_flash_cs;
     int8_t request_status;
     uint8_t tag_type[2];
 } att_card_diag_t;
