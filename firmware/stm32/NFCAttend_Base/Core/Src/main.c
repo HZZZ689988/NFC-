@@ -61,6 +61,9 @@ UartDrv_t g_uart6Drv;
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
+#ifdef RC522_ONLY_DIAG
+void RC522_Only_Diag_Run(void);
+#endif
 
 /* USER CODE END PFP */
 
@@ -93,6 +96,9 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+#ifdef RC522_ONLY_DIAG
+  RC522_Only_Diag_Run();
+#endif
 
   /* USER CODE END SysInit */
 

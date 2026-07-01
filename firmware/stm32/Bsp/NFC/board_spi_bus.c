@@ -20,6 +20,10 @@ static void board_spi_bus_init_once(void)
 
 void BoardSpiBus_Lock(void)
 {
+    if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
+        return;
+    }
+
     board_spi_bus_init_once();
     if (s_bus_mutex != NULL) {
         if (xSemaphoreTakeRecursive(s_bus_mutex, portMAX_DELAY) == pdPASS) {
@@ -33,6 +37,10 @@ void BoardSpiBus_Lock(void)
 
 void BoardSpiBus_Unlock(void)
 {
+    if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
+        return;
+    }
+
     if (s_bus_mutex != NULL) {
         taskENTER_CRITICAL();
         TaskHandle_t current = xTaskGetCurrentTaskHandle();

@@ -14,6 +14,9 @@
 # target
 ######################################
 TARGET = Demo_W25Q128
+ifeq ($(RC522_ONLY_DIAG),1)
+TARGET = RC522_Only_Diag
+endif
 
 
 ######################################
@@ -62,6 +65,7 @@ C_SOURCES =  \
 ../../third_party/littlefs/lfs.c \
 ../../third_party/littlefs/lfs_util.c \
 Core/Src/main.c \
+Core/Src/rc522_only_diag.c \
 Core/Src/gpio.c \
 Core/Src/freertos.c \
 Core/Src/adc.c \
@@ -168,6 +172,10 @@ C_DEFS =  \
 -DSTM32F407xx \
 -DATT_ENABLE_NETWORK=1 \
 -DATT_ENABLE_DISPLAY=1
+
+ifeq ($(RC522_ONLY_DIAG),1)
+C_DEFS += -DRC522_ONLY_DIAG
+endif
 
 
 # AS includes

@@ -289,3 +289,36 @@ Interpretation:
   board header mapping does not reach the RC522 module pins.
 - The board DAP exposes both SWD download/debug and `COM3`; OpenOCD programming
   and serial command validation can run over the same Type-C connection.
+
+## RC522-Only Diagnostic Firmware
+
+A dedicated RC522-only build mode was added and tested:
+
+```text
+make clean
+make RC522_ONLY_DIAG=1
+openocd.exe -f .\openocd.cfg -c "adapter speed 1000" -c "program build/RC522_Only_Diag.elf verify reset exit"
+```
+
+This firmware bypasses the attendance app, W25Q128/LittleFS bootstrap, ESP01S,
+OLED and FreeRTOS tasks. It initializes only GPIO, DMA, USART1 and the RC522
+platform, then prints the RC522 registers once per second.
+
+Result captured from `COM3`:
+
+```text
+RC522_ONLY:RAW=0x00|VER=0x00|CMD=0x00->0x00|IRQ=0x00->0x00|FIFO=0x00->0x00|TX=0x00->0x00|ERR=0x00->0x00|PINS=0x35->0x35|SHARE=1|REQ=255|TAG=0000|SCAN=255|UID=00000000
+RC522_ONLY:RAW=0x00|VER=0x00|CMD=0x00->0x00|IRQ=0x00->0x00|FIFO=0x00->0x00|TX=0x00->0x00|ERR=0x00->0x00|PINS=0x35->0x35|SHARE=1|REQ=255|TAG=0000|SCAN=255|UID=00000000
+RC522_ONLY:RAW=0x00|VER=0x00|CMD=0xFF->0x00|IRQ=0xFF->0x00|FIFO=0xFF->0x00|TX=0xFF->0x00|ERR=0xFF->0x00|PINS=0x3D->0x35|SHARE=1|REQ=255|TAG=0000|SCAN=255|UID=00000000
+RC522_ONLY:RAW=0x00|VER=0x00|CMD=0x00->0x00|IRQ=0x00->0x00|FIFO=0x00->0x00|TX=0x00->0x00|ERR=0x00->0x00|PINS=0x35->0x35|SHARE=1|REQ=255|TAG=0000|SCAN=255|UID=00000000
+```
+
+Interpretation:
+
+- The RC522-only image runs and USART1 output is visible on `COM3`.
+- Removing the attendance app, storage, network, display and scheduler tasks
+  does not make the RC522 version register readable.
+- `VER=0x00` still means the MCU is not receiving a valid response from RC522.
+- The remaining validation should be electrical: scope/logic-analyzer
+  `PB13/NSS`, `PB11/SCK`, `PC4/MOSI`, `PA1/MISO`, `PA2/RST`, confirm module
+  3.3 V/GND/orientation, and resolve the `PC4` shared W25Q128-CS risk.

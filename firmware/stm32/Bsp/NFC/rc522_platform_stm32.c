@@ -134,10 +134,13 @@ static void rst_control(uint8_t level)
 static uint8_t spi_transfer_byte(uint8_t data)
 {
     uint8_t rx = 0;
+    BaseType_t scheduler_started = (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED);
 
     /* 临界区保护：防止任务切换导致 SCK 时序断裂
      * 一个字节传输约 32 µs，临界区长度可接受 */
-    taskENTER_CRITICAL();
+    if (scheduler_started) {
+        taskENTER_CRITICAL();
+    }
 
     for (int8_t i = 7; i >= 0; i--) {
         /* SCK 下降沿 -> 拉低 SCK */
@@ -170,7 +173,9 @@ static uint8_t spi_transfer_byte(uint8_t data)
     HAL_GPIO_WritePin(NFC_SCK_GPIO_Port, NFC_SCK_Pin, GPIO_PIN_RESET);
     delay_us(1);
 
-    taskEXIT_CRITICAL();
+    if (scheduler_started) {
+        taskEXIT_CRITICAL();
+    }
 
     return rx;
 }
