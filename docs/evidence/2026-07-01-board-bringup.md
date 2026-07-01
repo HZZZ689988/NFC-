@@ -462,13 +462,21 @@ Firmware build: passed, text=105760 data=496 bss=46496
 16px GBK dot-matrix parse: glyphs are visibly more complete than 12px
 ```
 
-Download attempt was blocked by USB device enumeration:
+Initial download attempt was blocked by temporary USB device enumeration loss,
+then the board reappeared as `COM3` and CMSIS-DAP programming succeeded:
 
 ```text
-openocd.exe ... program build/Demo_W25Q128.elf verify reset exit
-Error: unable to find a matching CMSIS-DAP device
-Get-CimInstance Win32_SerialPort: no COM3/CMSIS-DAP serial device present
+openocd.exe -f .\openocd.cfg -c "adapter speed 1000" -c "program build/Demo_W25Q128.elf verify reset exit"
+OpenOCD: Programming Finished, Verified OK, Resetting Target
 ```
 
-Next action after reconnecting the board is to flash `build/Demo_W25Q128.elf`
-and send `OLEDTEST` over `COM3`.
+`OLEDTEST` was sent over `COM3` after flashing:
+
+```text
+OLEDTEST -> OK:OLEDTEST
+[ESP01S] RTC sync...
+ESP01S network ready
+```
+
+The 16px font firmware is now running on the board. The physical display should
+be checked for whether the larger font resolves the missing-stroke issue.
