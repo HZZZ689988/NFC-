@@ -82,3 +82,71 @@ Result:
 - Card issue/readback/clear was not tested.
 - OLED, LEDs, buzzer and ESP01S network paths were not tested.
 - The known board-level risk remains: active RC522 column A maps `MOSI` to `PC4`, while the inherited base project also labels `PC4` as W25Q128 CS. RC522 and W25Q128 must still be validated together under real card operations.
+
+## Storage Bootstrap Follow-Up
+
+The K6 storage-bootstrap path was run from the board and printed:
+
+```text
+W25Q128 ID: 0xEF17
+LittleFS storage ready
+Device config: id=1 mode=3 upload=1 repeat=60
+```
+
+Result:
+
+- W25Q128 JEDEC ID matches the expected `0xEF17`.
+- LittleFS mounted successfully.
+- Persistent config was readable from W25Q128/LittleFS.
+
+## ESP01S Network Follow-Up
+
+Test setup:
+
+- WiFi SSID: `abc`
+- WiFi password: `abc123456`
+- PC WLAN IPv4: `192.168.107.234`
+- Test TCP server: `python server/server.py --host 0.0.0.0 --port 9000`
+- Firmware config written through `COM3`:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
+CFG:SSID=abc
+CFG:PWD=abc123456
+CFG:HOST=192.168.107.234|PORT=9000
+CFG:WKEY=|WLOC=hangzhou
+```
+
+Readback through `CFG?`:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+```
+
+After reset, the board printed:
+
+```text
+[ESP01S] NTP授时成功(UDP): 2026-07-01 19:27:07
+[ESP01S] RTC已校准: 2026-07-01 19:27:13
+RTC synced from ESP01S NTP
+ESP01S network ready
+```
+
+The TCP server accepted a connection from the ESP01S and recorded:
+
+```text
+HEARTBEAT:DEV=1
+```
+
+Result:
+
+- Segmented `CFG:` writes persisted to LittleFS and were readable after write.
+- ESP01S connected to the `abc` 2.4 GHz WiFi network.
+- UDP NTP sync succeeded and calibrated the STM32 RTC.
+- TCP connection to `server/server.py` succeeded.
+- Heartbeat upload path reached the test server.
+
+Still not covered:
+
+- A real attendance `UPLOAD:` record and `ACK:UPLOAD:<seq>` round trip.
+- Weather query/cache, because no weather API key was configured.

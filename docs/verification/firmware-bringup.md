@@ -57,7 +57,7 @@ updated: 2026-07-01
 
 ## Hardware
 
-- [ ] W25Q128 ID reads as `0xEF17`.
+- [x] W25Q128 ID reads as `0xEF17`.
 - [x] LittleFS formats and mounts on the board.
 - [x] `config.bin` defaults are created on the board.
 - [ ] `records.bin` append/read passes CRC16.
@@ -71,14 +71,14 @@ updated: 2026-07-01
 - [ ] `UPDATEIMG` returns `ERR:NOT_READY` when any image block is missing.
 - [ ] Image-card block contents can be read back from RC522 and match upper-computer generated bitmap data.
 - [x] USART1 responds to `PING` and `CFG?`.
-- [ ] USART1 accepts segmented `CFG:` writes and persists `/config.bin` on W25Q128/LittleFS.
-- [ ] `CFG:` WiFi/server/weather/timezone changes are reflected in ESP01S startup behavior after config write.
+- [x] USART1 accepts segmented `CFG:` writes and persists `/config.bin` on W25Q128/LittleFS.
+- [x] `CFG:` WiFi/server/weather/timezone changes are reflected in ESP01S startup behavior after config write.
 - [ ] USART1 `LIST:N` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
-- [ ] ESP01S connects WiFi.
-- [ ] NTP sync updates RTC.
+- [x] ESP01S connects WiFi.
+- [x] NTP sync updates RTC.
 - [ ] RTC keeps valid time across reset/VBAT conditions and attendance timestamps use RTC Unix seconds.
 - [ ] TCP upload reaches `server/server.py`.
-- [ ] Heartbeat reaches `server/server.py`.
+- [x] Heartbeat reaches `server/server.py`.
 - [ ] OLED initializes on I2C1 and displays standby page.
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real card events.
 - [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.
