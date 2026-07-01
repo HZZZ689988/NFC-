@@ -10,8 +10,16 @@ typedef struct {
     char text[32];
 } gui_line_t;
 
+typedef struct {
+    unsigned short code;
+    int x;
+    int y;
+} gui_char_t;
+
 static gui_line_t g_lines[16];
+static gui_char_t g_chars[16];
 static unsigned g_line_count;
+static unsigned g_char_count;
 static unsigned g_update_count;
 
 struct GUI_FONT {
@@ -20,7 +28,7 @@ struct GUI_FONT {
 
 static const GUI_FONT g_default_font = {0};
 static const GUI_FONT *g_current_font = &g_default_font;
-const GUI_FONT GUI_FontHZ_SimSun_12 = {0};
+const GUI_FONT GUI_FontHZ_SimSun_8 = {0};
 
 static void require_int(int condition, const char *message)
 {
@@ -33,7 +41,9 @@ static void require_int(int condition, const char *message)
 static void reset_gui(void)
 {
     memset(g_lines, 0, sizeof(g_lines));
+    memset(g_chars, 0, sizeof(g_chars));
     g_line_count = 0u;
+    g_char_count = 0u;
 }
 
 int GUI_Init(void)
@@ -58,6 +68,16 @@ void GUI_DispStringAt(const char *text, int x, int y)
         g_lines[g_line_count].row = y / 8;
         snprintf(g_lines[g_line_count].text, sizeof(g_lines[g_line_count].text), "%s", text);
         g_line_count++;
+    }
+}
+
+void GUI_DispCharAt(unsigned short c, int x, int y)
+{
+    if (g_char_count < (sizeof(g_chars) / sizeof(g_chars[0]))) {
+        g_chars[g_char_count].code = c;
+        g_chars[g_char_count].x = x;
+        g_chars[g_char_count].y = y;
+        g_char_count++;
     }
 }
 
@@ -120,10 +140,10 @@ static void test_display_draws_ready_then_releases_event(void)
 
 static void test_display_draws_oled_ascii_pattern(void)
 {
-    static const char gbk_hdu[] =
-        "GBK:\xBA\xBC\xB5\xE7\xBF\xC6\xBC\xBC\xB4\xF3\xD1\xA7";
-    static const char gbk_name[] =
-        "\xD4\xF8\xD6\xDD\xD7\xD3\xD8\xB9";
+    static const unsigned short expected_codes[] = {
+        0xbabc, 0xb5e7, 0xbfc6, 0xbcbc, 0xb4f3, 0xd1a7,
+        0xd4f8, 0xd6dd, 0xd7d3, 0xd8b9,
+    };
 
     require_int(att_display_init() == ATT_OK, "display init should succeed");
 
@@ -133,8 +153,16 @@ static void test_display_draws_oled_ascii_pattern(void)
     require_int(strcmp(line_at(1), "ABCDEFGHIJKLMNO") == 0, "OLED test should show first alphabet row");
     require_int(strcmp(line_at(2), "PQRSTUVWXYZ0123") == 0, "OLED test should show second alphabet row");
     require_int(strcmp(line_at(3), "456789 !?:+-/") == 0, "OLED test should show punctuation row");
-    require_int(strcmp(line_at(5), gbk_hdu) == 0, "OLED test should show GBK SimSun row");
-    require_int(strcmp(line_at(6), gbk_name) == 0, "OLED test should show second GBK row");
+    require_int(strcmp(line_at(5), "GBK:") == 0, "OLED test should show GBK label");
+    require_int(g_char_count == (sizeof(expected_codes) / sizeof(expected_codes[0])),
+                "OLED test should draw all GBK characters directly");
+    for (unsigned i = 0u; i < sizeof(expected_codes) / sizeof(expected_codes[0]); i++) {
+        require_int(g_chars[i].code == expected_codes[i], "OLED test should draw expected GBK code");
+    }
+    require_int(g_chars[0].x == 28 && g_chars[1].x == 40,
+                "OLED test should draw GBK characters with wider spacing");
+    require_int(g_chars[5].y == 40 && g_chars[6].y == 52,
+                "OLED test should place GBK rows apart");
 }
 
 int main(void)

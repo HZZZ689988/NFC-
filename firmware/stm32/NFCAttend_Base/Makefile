@@ -53,7 +53,7 @@ C_SOURCES =  \
 ../Bsp/OLED/ssd1306_i2c.c \
 ../Bsp/OLED/GUISlim.c \
 ../Bsp/OLED/F08_ASCII.c \
-../Bsp/OLED/SimSun_12.c \
+../Bsp/OLED/SimSun_8.c \
 ../Bsp/RTC/bsp_rtc.c \
 ../../app/Src/attendance_app.c \
 ../../app/Src/att_card.c \

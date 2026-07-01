@@ -9,7 +9,7 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_12;
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_8;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -93,14 +93,25 @@ static void set_event(att_display_event_t event, uint32_t now_sec)
 }
 
 #if ATT_ENABLE_DISPLAY
-static const char s_gbk_hdu[] =
-    "GBK:\xBA\xBC\xB5\xE7\xBF\xC6\xBC\xBC\xB4\xF3\xD1\xA7";
-static const char s_gbk_name[] =
-    "\xD4\xF8\xD6\xDD\xD7\xD3\xD8\xB9";
+static const uint16_t s_hdu_codes[] = {
+    0xbabc, 0xb5e7, 0xbfc6, 0xbcbc, 0xb4f3, 0xd1a7,
+};
+static const uint16_t s_name_codes[] = {
+    0xd4f8, 0xd6dd, 0xd7d3, 0xd8b9,
+};
 
 static void draw_line(uint8_t row, const char *text)
 {
     GUI_DispStringAt(text, 0, (int)row * 8);
+}
+
+static void draw_gbk_codes(const uint16_t *codes, size_t count, int x, int y)
+{
+    size_t i;
+
+    for (i = 0u; i < count; i++) {
+        GUI_DispCharAt(codes[i], x + (int)i * 12, y);
+    }
 }
 
 static void draw_status_screen(uint32_t now_sec)
@@ -262,9 +273,10 @@ void att_display_show_oled_test(void)
     draw_line(2u, "PQRSTUVWXYZ0123");
     draw_line(3u, "456789 !?:+-/");
 
-    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_12);
-    GUI_DispStringAt(s_gbk_hdu, 0, 40);
-    GUI_DispStringAt(s_gbk_name, 0, 52);
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_8);
+    GUI_DispStringAt("GBK:", 0, 40);
+    draw_gbk_codes(s_hdu_codes, sizeof(s_hdu_codes) / sizeof(s_hdu_codes[0]), 28, 40);
+    draw_gbk_codes(s_name_codes, sizeof(s_name_codes) / sizeof(s_name_codes[0]), 28, 52);
     GUI_SetFont(old_font);
     GUI_Update();
 #endif

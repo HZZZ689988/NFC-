@@ -300,7 +300,7 @@ void      GUI_SetColor     (GUI_COLOR);
 void  GUI_DispCEOL (void);
 //void  GUI_DispChar  (U16 c);
 //void  GUI_DispChars (U16 c, int Cnt);
-//void  GUI_DispCharAt(U16 c, I16P x, I16P y);
+void  GUI_DispCharAt(U16 c, I16P x, I16P y);
 void  GUI_DispString         (const char GUI_UNI_PTR *s);
 void  GUI_DispStringAt       (const char GUI_UNI_PTR *s, int x, int y);
 //void  GUI_DispStringAtCEOL   (const char GUI_UNI_PTR *s, int x, int y);
