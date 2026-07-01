@@ -5,10 +5,10 @@
  *          使用 CubeMX 生成的 GPIO 引脚定义，通过软件模拟 SPI 与 RC522 通讯。
  *
  *          引脚连接 (默认，可在 main.h 中修改):
- *          - NFC_NSS(PB12)  -> 片选 (CS/SDA)
- *          - NFC_RST(PC1)   -> 复位 (RST)
- *          - NFC_MOSI(PC5)  -> MOSI
- *          - NFC_MISO(PB13) -> MISO
+ *          - NFC_NSS(PB13)  -> 片选 (CS/SDA)
+ *          - NFC_RST(PA2)   -> 复位 (RST)
+ *          - NFC_MOSI(PC4)  -> MOSI
+ *          - NFC_MISO(PA1)  -> MISO
  *          - NFC_SCK(PB11)  -> SCK
  *          - GND/+3V3       -> 模块物理供电
  *

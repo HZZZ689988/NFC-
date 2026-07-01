@@ -12,7 +12,7 @@ Source: extracted CubeMX/BSP materials under `extracted/C_work`.
 | --- | --- | --- |
 | OLED | I2C1 | PB6/PB7 |
 | W25Q128 | SPI1 | PA5/PA6/PA7, CS PC4 |
-| RC522 | Software SPI | NSS PB12, RST PC1, MOSI PC5, MISO PB13, SCK PB11 |
+| RC522 | Software SPI | Header column A: NSS PB13, SCK PB11, MOSI PC4, MISO PA1, RST PA2 |
 | PC serial | USART1 | PA9/PA10 |
 | ESP01S | USART6 | PC6/PC7 |
 | Keys | GPIO | PE1-PE6 |
@@ -22,19 +22,28 @@ Source: extracted CubeMX/BSP materials under `extracted/C_work`.
 
 ## RC522 Wiring
 
-Use the HE32F4 RC522-accessible header pins provided on the board. Keep `PC4`
-and `PA7` reserved for the onboard W25Q128 SPI1 flash because LittleFS storage
-depends on that flash.
+Use one complete RC522 header column. Do not mix pins between the two columns.
+The firmware is configured for column A, using the header order
+`3.3V/GND/RST/MISO/MOSI/SCK/NSS/extra`.
 
-| RC522 module pin | STM32 pin |
+| RC522 module pin | Column A STM32 pin/header label |
 | --- | --- |
-| `NSS` / `SDA` / `CS` | `PB12` |
-| `SCK` | `PB11` |
-| `MOSI` | `PC5` |
-| `MISO` | `PB13` |
-| `RST` | `PC1` |
-| `GND` | `GND` |
 | `3.3V` | `3.3V` |
+| `GND` | `GND` |
+| `RST` | `PA2` |
+| `MISO` | `PA1` |
+| `MOSI` | `PC4` |
+| `SCK` | `PB11` |
+| `NSS` / `SDA` / `CS` | `PB13` |
+| `IRQ` / unused extra pin | `ETH` |
+
+Column B is physically present as `3.3V`, `GND`, `PC1`, `PA7`, `PC5`, `PB12`,
+`NC`. It is not the active firmware mapping because the last RC522 signal would
+land on `NC` with the same header ordering. Its extra label is `RM11`.
+
+Column A shares `PC4` with the existing W25Q128 chip-select label in the base
+project. Treat the real board validation of RC522 plus W25Q128 as required
+before marking hardware complete.
 
 Do not power the RC522 from 5 V.
 
