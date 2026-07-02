@@ -682,3 +682,7 @@ PING -> OK:PONG
 This confirms the command-level UI/feedback harness and LittleFS persistence
 after reset. Physical OLED/LED/buzzer pass/fail still depends on visual/audio
 observation during the sequence above.
+
+User physical observation on 2026-07-02: buzzer sound and OLED pages were
+approximately correct and matched expectations. LED physical mapping was not
+explicitly confirmed in this observation.

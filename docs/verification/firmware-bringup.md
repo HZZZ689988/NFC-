@@ -89,8 +89,8 @@ updated: 2026-07-02
 - [x] Heartbeat reaches `server/server.py`.
 - [x] OLED initializes on I2C1 and responds to `OLEDTEST` with the sparse 24px test page.
 - [x] USART1 `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands trigger OLED/feedback paths and acknowledge over `COM3`.
-- [ ] OLED displays standby page in normal runtime.
-- [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real card events.
+- [x] OLED displays standby and simulated attendance/network pages through `UITEST`, confirmed by physical observation.
+- [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real RC522 card events.
 - [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.
 - [ ] LittleFS `/weather.txt` is created/updated after successful weather query and reloaded on reboot.
 - [ ] L1 indicates attendance OK on a real card event.
@@ -98,5 +98,6 @@ updated: 2026-07-02
 - [ ] L3 indicates duplicate attendance skip.
 - [ ] L4 indicates storage/card/network fault.
 - [ ] L5 indicates network-online transition.
-- [ ] TIM3_CH1 PB4 buzzer emits the mapped short tones for attendance and network feedback.
+- [x] TIM3_CH1 PB4 buzzer emits the mapped short tones for simulated attendance and network feedback, confirmed by physical observation.
+- [ ] TIM3_CH1 PB4 buzzer emits the mapped short tones after real RC522 card events.
 - [x] `CFG?` and `LIST:3` still report persisted config and uploaded records after DAP reset.
