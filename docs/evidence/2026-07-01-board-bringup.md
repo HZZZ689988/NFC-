@@ -974,3 +974,65 @@ stored and remained pending. After restoring the server endpoint, the board sent
 the pending `UPLOAD:` frame, received the test server ACK, and persisted
 `UP=DONE` in LittleFS. This validates the non-RC522 offline retention and
 recovery upload path.
+
+## Config Persistence And Restore Check
+
+Date: 2026-07-02.
+
+RC522 remained paused. The current production configuration was first read as
+the baseline:
+
+```text
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+```
+
+A deliberately non-default configuration was written in segmented `CFG:`
+commands:
+
+```text
+CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|TZ=9 -> OK:CFG
+CFG:SSID=abc -> OK:CFG
+CFG:PWD=abc123456 -> OK:CFG
+CFG:HOST=192.168.107.234|PORT=8998 -> OK:CFG
+CFG:WKEY=|WLOC=test-hangzhou -> OK:CFG
+CFG? -> CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|HOST=192.168.107.234|PORT=8998|TZ=9|SSID=abc|WLOC=test-hangzhou
+```
+
+After a CMSIS-DAP reset, the temporary configuration was still present:
+
+```text
+reset run -> OK
+Attendance app ready
+ESP01S network start failed: -3
+CFG? -> CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|HOST=192.168.107.234|PORT=8998|TZ=9|SSID=abc|WLOC=test-hangzhou
+```
+
+The `ESP01S network start failed: -3` result was expected because the temporary
+server port was intentionally unreachable. The production configuration was then
+restored. The private weather key was rewritten but not recorded in this file:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8 -> OK:CFG
+CFG:SSID=abc -> OK:CFG
+CFG:PWD=abc123456 -> OK:CFG
+CFG:HOST=192.168.107.234|PORT=9000 -> OK:CFG
+CFG:WKEY=<redacted>|WLOC=30.267:120.153 -> OK:CFG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+```
+
+After a second CMSIS-DAP reset, the restored production configuration loaded and
+the network/weather paths were healthy:
+
+```text
+reset run -> OK
+Attendance app ready
+RTC synced from ESP01S NTP
+ESP01S network ready
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+WEATHER? -> WEATHER:Light 23C
+```
+
+Conclusion: `/config.bin` persists segmented device, mode, upload, repeat,
+timezone, WiFi, server and weather-location settings across reset. Runtime
+network configuration is reapplied after reset, and the board was returned to
+the production configuration.

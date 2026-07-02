@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback.
+The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback.
 
 ## Implemented
 
@@ -55,6 +55,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - CMSIS-DAP flashing and verify/reset.
 - USART1 over `COM3` responds to `PING`, `CFG?`, `LIST:1`, `LIST:ALL` and `OLEDTEST` after repeated commands.
 - W25Q128/LittleFS mounts and loads persistent `/config.bin`.
+- Segmented `CFG:` writes for device/mode/upload/repeat/timezone/WiFi/server/weather fields persist across CMSIS-DAP reset and can be restored to production values.
 - Empty board storage returns `LIST:COUNT=0` and `LIST:END`; simulated records are appended and read back through the CRC-checked record path.
 - OLED initializes and displays the sparse 24px `OLEDTEST` and weather pages.
 - `WEATHERTEST:Sunny 20C` creates/updates `/weather.txt`; `WEATHER?` reads it back as `WEATHER:Sunny 20C` after DAP reset.
