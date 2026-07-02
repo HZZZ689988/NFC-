@@ -68,6 +68,7 @@ class Database:
                     occurred_at TEXT,
                     device_id INTEGER,
                     status TEXT,
+                    upload_state TEXT,
                     raw_line TEXT NOT NULL,
                     imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
@@ -89,6 +90,12 @@ class Database:
                 WHERE device_id IS NOT NULL AND seq IS NOT NULL;
                 """
             )
+            columns = {
+                row["name"]
+                for row in self.conn.execute("PRAGMA table_info(attendance_records)")
+            }
+            if "upload_state" not in columns:
+                self.conn.execute("ALTER TABLE attendance_records ADD COLUMN upload_state TEXT")
             self.conn.commit()
 
     def upsert_person(self, person: Person) -> None:
@@ -139,11 +146,11 @@ class Database:
     def import_record_line(self, raw_line: str) -> None:
         parsed = parse_record_line(raw_line)
         with self._lock:
-            self.conn.execute(
+            cursor = self.conn.execute(
                 """
                 INSERT OR IGNORE INTO attendance_records
-                    (seq, uid_hex, sid, record_type, occurred_at, device_id, status, raw_line)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (seq, uid_hex, sid, record_type, occurred_at, device_id, status, upload_state, raw_line)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     parsed.get("seq"),
@@ -153,9 +160,35 @@ class Database:
                     parsed.get("occurred_at"),
                     parsed.get("device_id"),
                     parsed.get("status"),
+                    parsed.get("upload_state"),
                     raw_line,
                 ),
             )
+            if cursor.rowcount == 0 and parsed.get("device_id") is not None and parsed.get("seq") is not None:
+                self.conn.execute(
+                    """
+                    UPDATE attendance_records
+                    SET uid_hex=?,
+                        sid=?,
+                        record_type=?,
+                        occurred_at=?,
+                        status=?,
+                        upload_state=?,
+                        raw_line=?
+                    WHERE device_id=? AND seq=?
+                    """,
+                    (
+                        parsed.get("uid_hex"),
+                        parsed.get("sid"),
+                        parsed.get("record_type"),
+                        parsed.get("occurred_at"),
+                        parsed.get("status"),
+                        parsed.get("upload_state"),
+                        raw_line,
+                        parsed.get("device_id"),
+                        parsed.get("seq"),
+                    ),
+                )
             self.conn.commit()
 
     def list_attendance(self, limit: int = 200) -> list[sqlite3.Row]:
@@ -163,7 +196,7 @@ class Database:
             return list(
                 self.conn.execute(
                     """
-                    SELECT seq, uid_hex, sid, record_type, occurred_at, device_id, status, imported_at
+                    SELECT seq, uid_hex, sid, record_type, occurred_at, device_id, status, upload_state, imported_at
                     FROM attendance_records
                     ORDER BY id DESC
                     LIMIT ?
@@ -176,7 +209,17 @@ class Database:
         rows = self.list_attendance(limit=100000)
         with Path(target).open("w", newline="", encoding="utf-8-sig") as handle:
             writer = csv.writer(handle)
-            writer.writerow(["seq", "uid_hex", "sid", "record_type", "occurred_at", "device_id", "status", "imported_at"])
+            writer.writerow([
+                "seq",
+                "uid_hex",
+                "sid",
+                "record_type",
+                "occurred_at",
+                "device_id",
+                "status",
+                "upload_state",
+                "imported_at",
+            ])
             for row in rows:
                 writer.writerow([row[key] for key in row.keys()])
 
@@ -201,6 +244,8 @@ def parse_record_line(raw_line: str) -> dict[str, object]:
                 parsed["sid"] = _to_int(value)
             elif key == "DEV":
                 parsed["device_id"] = _to_int(value)
+            elif key == "UP":
+                parsed["upload_state"] = value.upper()
             else:
                 parsed[key.lower()] = value
         elif index == 3:

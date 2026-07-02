@@ -1159,3 +1159,34 @@ anti-repeat rejection, pending upload retention, upload-enable gating, recovery
 upload, CRC-framed command parsing, invalid-frame rejection, bad argument
 rejection and no-card card-command rejection were all validated on the board.
 The board was restored to production config.
+
+## Upper-Computer SQLite And CSV Validation
+
+Date: 2026-07-02.
+
+RC522 remained paused. This pass closed the upper-computer local persistence
+requirements that do not need real card RF I/O:
+
+- People are inserted/updated in SQLite.
+- Issue logs are inserted for card-writing actions.
+- Lost-card marks can be set and cleared.
+- Board `REC:` lines with `UP=PENDING/DONE/FAILED` are parsed into
+  `upload_state`.
+- Re-importing the same `DEV+SEQ` record refreshes upload state, for example
+  `PENDING` to `DONE`, without creating a duplicate row.
+- Existing SQLite databases are migrated by adding the `upload_state` column.
+- Attendance CSV export uses UTF-8-SIG and includes the upload-state column.
+
+Host verification:
+
+```text
+python pc_tool/tests/test_core.py -> passed
+python -m compileall pc_tool server -> passed
+python tools/run_verification.py -> passed
+git diff --check -> passed
+```
+
+Conclusion: the upper-computer now preserves the upload status returned by the
+board, displays it in the attendance-record table and exports it with the rest
+of the attendance data. This validates the SQLite/CSV side of the
+upper-computer requirements while RC522 card operations remain paused.

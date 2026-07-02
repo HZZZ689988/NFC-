@@ -269,7 +269,7 @@ class AttendanceApp(tk.Tk):
         ttk.Button(controls, text="刷新本地", command=self.refresh_records).pack(side=tk.LEFT, padx=6)
         ttk.Button(controls, text="导出 CSV", command=self.export_records).pack(side=tk.LEFT)
 
-        columns = ("seq", "uid", "sid", "rtype", "time", "device", "status", "imported")
+        columns = ("seq", "uid", "sid", "rtype", "time", "device", "status", "upload", "imported")
         self.records_tree = ttk.Treeview(self.records_tab, columns=columns, show="headings")
         headings = {
             "seq": "序号",
@@ -279,9 +279,20 @@ class AttendanceApp(tk.Tk):
             "time": "时间",
             "device": "设备",
             "status": "状态",
+            "upload": "上传",
             "imported": "导入时间",
         }
-        widths = {"seq": 60, "uid": 100, "sid": 80, "rtype": 80, "time": 150, "device": 70, "status": 80, "imported": 150}
+        widths = {
+            "seq": 60,
+            "uid": 100,
+            "sid": 80,
+            "rtype": 80,
+            "time": 150,
+            "device": 70,
+            "status": 80,
+            "upload": 90,
+            "imported": 150,
+        }
         for key in columns:
             self.records_tree.heading(key, text=headings[key])
             self.records_tree.column(key, width=widths[key], anchor=tk.CENTER)
@@ -737,6 +748,7 @@ class AttendanceApp(tk.Tk):
                     row["occurred_at"] or "",
                     row["device_id"] or "",
                     row["status"] or "",
+                    row["upload_state"] or "",
                     row["imported_at"],
                 ),
             )

@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, upper-computer serial-client interop, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, anti-repeat substitute validation, upload-enable gating, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback.
+The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, upper-computer serial-client interop, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, anti-repeat substitute validation, upload-enable gating, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback. Upper-computer SQLite and CSV persistence are host-validated for people, issue logs, lost-card marks, attendance import, upload-state refresh and UTF-8-SIG export.
 
 ## Implemented
 
@@ -37,11 +37,13 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - The upper-computer now has a device config tab that sends segmented `CFG:` commands for device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone; firmware saves those fields into `/config.bin` and reapplies display/network runtime state.
 - The upper-computer device config tab can also read cached weather, write a short test weather cache string, force one real ESP01S weather query and read the current device time source.
 - `UPLOAD=0` disables heartbeat and pending-record upload attempts while keeping NTP time sync and weather cache/display polling active when the ESP01S network path is ready.
+- The upper-computer stores board `UP=PENDING/DONE/FAILED` state in SQLite, displays it in the attendance-record table and exports it to CSV; repeated imports of the same `DEV+SEQ` refresh status without duplicating rows.
 
 ## Verified On Host
 
 - `python -m compileall pc_tool server` passed.
 - `python pc_tool/tests/test_core.py` passed.
+- Upper-computer tests cover people upsert, issue-log insert, lost-card flag updates, `REC:` upload-state parsing, duplicate `DEV+SEQ` refresh from `PENDING` to `DONE`, SQLite schema migration and UTF-8-SIG CSV export.
 - `pc_tool.nfc_attendance_tool.SerialClient` was validated against the live board on `COM3` for `CFG?`, `TIME?`, `WEATHER?`, `WEATHERTEST`, `WEATHER!` and `LIST:2`.
 - `python firmware/app/tests/run_host_tests.py` builds and runs the native C host test executables for protocol routing, USART line buffering, local NFC polling, ESP01S network parsing and network polling schedule.
 - `python tools/run_verification.py` is the default host verification entrypoint; `--firmware-build` adds STM32 clean build and ELF segment permission checks.

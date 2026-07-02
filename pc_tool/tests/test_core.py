@@ -1,4 +1,6 @@
 from pathlib import Path
+import csv
+import sqlite3
 import sys
 import tempfile
 
@@ -141,6 +143,124 @@ def test_database_ignores_duplicate_device_seq() -> None:
         db.import_record_line(line)
         db.import_record_line(line)
         assert len(db.list_attendance()) == 1
+        db.close()
+
+
+def test_record_parse_upload_state() -> None:
+    parsed = parse_record_line("REC:SEQ=8|UID=A1B2C3D5|SID=1002|NORMAL|1783014648|DEV=1|OK|UP=done")
+
+    assert parsed["seq"] == 8
+    assert parsed["record_type"] == "NORMAL"
+    assert parsed["occurred_at"] == "1783014648"
+    assert parsed["upload_state"] == "DONE"
+
+
+def test_database_issue_log_and_lost_flag() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(Path(tmp) / "attendance.db")
+        person = Person("A1B2C3D6", 1003, "Alice", "R&D", 1, 5)
+
+        db.upsert_person(person)
+        db.add_issue_log(person, "ISSUE", "OK")
+        db.mark_lost(person.uid_hex, True)
+        assert db.list_people()[0]["lost"] == 1
+
+        db.mark_lost(person.uid_hex, False)
+        assert db.list_people()[0]["lost"] == 0
+
+        issue_log = db.conn.execute(
+            "SELECT uid_hex, sid, name, department, card_type, action, status FROM issue_logs"
+        ).fetchone()
+        assert dict(issue_log) == {
+            "uid_hex": "A1B2C3D6",
+            "sid": 1003,
+            "name": "Alice",
+            "department": "R&D",
+            "card_type": 1,
+            "action": "ISSUE",
+            "status": "OK",
+        }
+        db.close()
+
+
+def test_database_imports_and_exports_upload_state() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(Path(tmp) / "attendance.db")
+        line = "REC:SEQ=2|UID=A1B2C3D7|SID=1004|NORMAL|1783014648|DEV=1|OK|UP=DONE"
+        db.import_record_line(line)
+
+        row = db.list_attendance()[0]
+        assert row["upload_state"] == "DONE"
+
+        csv_path = Path(tmp) / "attendance.csv"
+        db.export_attendance_csv(csv_path)
+        raw = csv_path.read_bytes()
+        assert raw.startswith(b"\xef\xbb\xbf")
+
+        with csv_path.open("r", newline="", encoding="utf-8-sig") as handle:
+            rows = list(csv.reader(handle))
+
+        assert rows[0] == [
+            "seq",
+            "uid_hex",
+            "sid",
+            "record_type",
+            "occurred_at",
+            "device_id",
+            "status",
+            "upload_state",
+            "imported_at",
+        ]
+        assert rows[1][:8] == ["2", "A1B2C3D7", "1004", "NORMAL", "1783014648", "1", "OK", "DONE"]
+        db.close()
+
+
+def test_database_refreshes_duplicate_upload_state() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(Path(tmp) / "attendance.db")
+        pending = "REC:SEQ=4|UID=A1B2C3D9|SID=1006|NORMAL|1783014651|DEV=1|OK|UP=PENDING"
+        done = "REC:SEQ=4|UID=A1B2C3D9|SID=1006|NORMAL|1783014651|DEV=1|OK|UP=DONE"
+
+        db.import_record_line(pending)
+        db.import_record_line(done)
+        rows = db.list_attendance()
+
+        assert len(rows) == 1
+        assert rows[0]["upload_state"] == "DONE"
+        db.close()
+
+
+def test_database_migrates_upload_state_column() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "attendance.db"
+        conn = sqlite3.connect(path)
+        conn.executescript(
+            """
+            CREATE TABLE attendance_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                seq INTEGER,
+                uid_hex TEXT,
+                sid INTEGER,
+                record_type TEXT,
+                occurred_at TEXT,
+                device_id INTEGER,
+                status TEXT,
+                raw_line TEXT NOT NULL,
+                imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+        conn.close()
+
+        db = Database(path)
+        columns = {
+            row["name"]
+            for row in db.conn.execute("PRAGMA table_info(attendance_records)")
+        }
+        assert "upload_state" in columns
+
+        db.import_record_line("REC:SEQ=3|UID=A1B2C3D8|SID=1005|NORMAL|1783014650|DEV=1|OK|UP=PENDING")
+        assert db.list_attendance()[0]["upload_state"] == "PENDING"
         db.close()
 
 
