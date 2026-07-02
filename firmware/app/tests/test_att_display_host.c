@@ -29,7 +29,7 @@ struct GUI_FONT {
 
 static const GUI_FONT g_default_font = {0};
 static const GUI_FONT *g_current_font = &g_default_font;
-const GUI_FONT GUI_FontHZ_SimSun_24 = {0};
+const GUI_FONT GUI_FontHZ_SimSun_16 = {0};
 
 static void require_int(int condition, const char *message)
 {
@@ -147,11 +147,15 @@ static void test_display_draws_oled_gbk_demo_string(void)
     att_display_show_oled_test();
     att_display_poll(0u);
 
-    require_int(g_line_count == 1u, "OLED test should use the official demo string path");
-    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
-                "OLED test should draw with SimSun 24");
-    require_int(strcmp(g_lines[0].text, "\xc4\xfa\xba\xc3\xa3\xa1\nOLED") == 0,
-                "OLED test should draw the official GBK demo string");
+    require_int(g_line_count == 3u, "OLED test should draw sparse SimSun 16 lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_16,
+                "OLED test should draw with SimSun 16");
+    require_int(strcmp(g_lines[0].text, "\xc4\xfa\xba\xc3") == 0,
+                "OLED test line 0 should draw GBK hello");
+    require_int(strcmp(g_lines[1].text, "\xbf\xbc\xc7\xda") == 0,
+                "OLED test line 1 should draw GBK attendance");
+    require_int(strcmp(g_lines[2].text, "\xc7\xeb\xcb\xa2\xbf\xa8") == 0,
+                "OLED test line 2 should draw GBK tap-card prompt");
     require_int(g_char_count == 0u, "OLED test should not use the direct character path");
 }
 

@@ -9,7 +9,7 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_24;
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_16;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -99,7 +99,9 @@ static void set_event(att_display_event_t event, uint32_t now_sec)
  * Keep Chinese OLED diagnostics as explicit GBK bytes so source-file encoding
  * cannot turn them into UTF-8 sequences.
  */
-static const char s_oled_demo_gbk[] = "\xc4\xfa\xba\xc3\xa3\xa1\nOLED";
+static const char s_oled_test_hello_gbk[] = "\xc4\xfa\xba\xc3";
+static const char s_oled_test_attend_gbk[] = "\xbf\xbc\xc7\xda";
+static const char s_oled_test_tap_gbk[] = "\xc7\xeb\xcb\xa2\xbf\xa8";
 
 static void draw_line(uint8_t row, const char *text)
 {
@@ -113,8 +115,10 @@ static void draw_oled_test_screen(void)
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
 
-    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_24);
-    GUI_DispStringAt(s_oled_demo_gbk, 0, 0);
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_16);
+    GUI_DispStringAt(s_oled_test_hello_gbk, 0, 0);
+    GUI_DispStringAt(s_oled_test_attend_gbk, 0, 20);
+    GUI_DispStringAt(s_oled_test_tap_gbk, 0, 40);
     GUI_SetFont(old_font);
     GUI_Update();
 }
