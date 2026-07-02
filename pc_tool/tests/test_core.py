@@ -16,6 +16,9 @@ from nfc_attendance_tool.protocol import (
     build_config_commands,
     build_crc_frame,
     build_issue,
+    build_weather_force_query,
+    build_weather_query,
+    build_weather_test,
     chunk_commands,
     crc16_ccitt_false,
     parse_crc_frame,
@@ -72,6 +75,22 @@ def test_build_config_rejects_ambiguous_text() -> None:
         pass
     else:
         raise AssertionError("ambiguous config text was accepted")
+
+
+def test_build_weather_commands() -> None:
+    assert build_weather_query() == "WEATHER?\n"
+    assert build_weather_test(" Sunny 20C ") == "WEATHERTEST:Sunny 20C\n"
+    assert build_weather_force_query() == "WEATHER!\n"
+
+
+def test_build_weather_test_rejects_ambiguous_text() -> None:
+    for value in ("", "Bad|Text", "Bad=Text"):
+        try:
+            build_weather_test(value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("ambiguous weather text was accepted")
 
 
 def test_issue_rejects_uint32_overflow() -> None:
@@ -162,6 +181,19 @@ def test_serial_transact_accepts_ok_prefix() -> None:
 
     assert fake.writes == [b"ISSUE:A1B2C3D4,1001,0,1\n"]
     assert lines == ["OK:ISSUE"]
+
+
+def test_serial_transact_accepts_weather_response() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    fake.responses = ["WEATHER:Sunny 20C"]
+    client._serial = fake  # type: ignore[attr-defined]
+
+    lines = client.transact("WEATHER?\n", timeout=0.2)
+
+    assert fake.writes == [b"WEATHER?\n"]
+    assert lines == ["WEATHER:Sunny 20C"]
+
 
 def test_success_response_accepts_ok_prefix() -> None:
     from nfc_attendance_tool.protocol import is_success_response

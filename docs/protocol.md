@@ -101,7 +101,8 @@ while RC522 is paused. Supported cases are `READY`, `OK`, `DUP`, `INVALID`,
 `WEATHERTEST:<text>` stores a short test weather string, updates the OLED weather
 page and returns `OK:WEATHERTEST`. `WEATHER!` forces one ESP01S weather query
 when WiFi/network is ready and weather config is present; it returns
-`WEATHER:<text>` on success or `ERR:NOT_READY` / `ERR:WEATHER` on failure.
+`WEATHER:<text>` on success or `ERR:NOT_READY` / `ERR:WEATHER` on failure. The
+upper-computer device-config tab exposes all three weather diagnostic commands.
 
 ## Device Config
 

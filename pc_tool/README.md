@@ -17,6 +17,7 @@ Python/Tkinter 上位机工具，用于串口连接 STM32 下位机、读卡、�
   - `UPDATEIMG`
 - SQLite 本地保存人员、发卡日志和考勤记录。
 - 支持 `LIST:N` 从下位机读取记录。
+- 设备配置页支持 `WEATHER?`、`WEATHERTEST:<text>` 和 `WEATHER!` 天气缓存诊断。
 - 新协议支持 `$PAYLOAD*CRC16`，旧 ASCII 命令暂时保留兼容。
 
 ## 运行

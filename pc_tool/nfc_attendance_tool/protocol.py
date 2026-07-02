@@ -102,6 +102,21 @@ def build_config_query() -> str:
     return "CFG?\n"
 
 
+def build_weather_query() -> str:
+    return "WEATHER?\n"
+
+
+def build_weather_test(text: str) -> str:
+    value = _validate_config_text(text, "Weather text", 31)
+    if not value:
+        raise ValueError("Weather text cannot be empty")
+    return f"WEATHERTEST:{value}\n"
+
+
+def build_weather_force_query() -> str:
+    return "WEATHER!\n"
+
+
 def build_clear(uid_hex: str) -> str:
     return f"CLEAR:{normalize_uid(uid_hex)}\n"
 

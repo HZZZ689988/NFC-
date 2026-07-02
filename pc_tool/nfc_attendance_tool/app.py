@@ -27,6 +27,9 @@ from .protocol import (
     build_list,
     build_read,
     build_update_image,
+    build_weather_force_query,
+    build_weather_query,
+    build_weather_test,
     chunk_commands,
     normalize_uid,
 )
@@ -79,6 +82,7 @@ class AttendanceApp(tk.Tk):
         self.cfg_server_port_var = tk.StringVar(value="9000")
         self.cfg_weather_key_var = tk.StringVar()
         self.cfg_weather_location_var = tk.StringVar(value="hangzhou")
+        self.cfg_weather_test_var = tk.StringVar(value="Sunny 20C")
         self.cfg_timezone_var = tk.StringVar(value="8")
 
         self.build_styles()
@@ -319,13 +323,30 @@ class AttendanceApp(tk.Tk):
             row=5, column=0, columnspan=2, sticky="w", pady=(6, 0)
         )
 
+        ttk.Label(self.config_tab, text="测试天气").grid(row=5, column=2, sticky="w", padx=(0, 6), pady=5)
+        ttk.Entry(self.config_tab, textvariable=self.cfg_weather_test_var).grid(
+            row=5, column=3, sticky="ew", padx=(0, 14), pady=5
+        )
+
         actions = ttk.Frame(self.config_tab)
         actions.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(12, 0))
         self.query_config_btn = ttk.Button(actions, text="读取配置", command=self.query_config)
         self.query_config_btn.pack(side=tk.LEFT)
         self.write_config_btn = ttk.Button(actions, text="写入配置", style="Action.TButton", command=self.write_config)
         self.write_config_btn.pack(side=tk.LEFT, padx=8)
-        self.serial_buttons.extend([self.query_config_btn, self.write_config_btn])
+        self.query_weather_btn = ttk.Button(actions, text="读取天气", command=self.query_weather)
+        self.query_weather_btn.pack(side=tk.LEFT)
+        self.write_weather_test_btn = ttk.Button(actions, text="写测试天气", command=self.write_weather_test)
+        self.write_weather_test_btn.pack(side=tk.LEFT, padx=8)
+        self.force_weather_btn = ttk.Button(actions, text="强制查天气", command=self.force_weather_query)
+        self.force_weather_btn.pack(side=tk.LEFT)
+        self.serial_buttons.extend([
+            self.query_config_btn,
+            self.write_config_btn,
+            self.query_weather_btn,
+            self.write_weather_test_btn,
+            self.force_weather_btn,
+        ])
 
     def build_log_tab(self) -> None:
         self.log_tab.rowconfigure(0, weight=1)
@@ -538,6 +559,20 @@ class AttendanceApp(tk.Tk):
             messagebox.showwarning(APP_TITLE, str(exc))
             return
         self.run_serial_job("写入配置", commands)
+
+    def query_weather(self) -> None:
+        self.run_serial_job("读取天气", [build_weather_query()], expect_multi=True)
+
+    def write_weather_test(self) -> None:
+        try:
+            command = build_weather_test(self.cfg_weather_test_var.get())
+        except Exception as exc:
+            messagebox.showwarning(APP_TITLE, str(exc))
+            return
+        self.run_serial_job("写测试天气", [command])
+
+    def force_weather_query(self) -> None:
+        self.run_serial_job("强制查天气", [build_weather_force_query()], expect_multi=True)
 
     def run_serial_job(
         self,

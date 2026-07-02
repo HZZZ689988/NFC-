@@ -13,7 +13,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 
 ## Implemented
 
-- `pc_tool/`: Python/Tkinter upper-computer for serial communication, card issuing, image blocks, SQLite records and attendance import.
+- `pc_tool/`: Python/Tkinter upper-computer for serial communication, card issuing, image blocks, SQLite records, attendance import and weather cache diagnostics.
 - `firmware/stm32/NFCAttend_Base/`: STM32 HAL/FreeRTOS base copied from `Demo_W25Q128`.
 - `firmware/stm32/Bsp/`: BSP drivers for W25Q128, RC522, OLED, ESP01S, UART, Key, LED and related modules.
 - `firmware/third_party/littlefs/`: LittleFS source.
@@ -29,12 +29,13 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - `SIMATT:<uid>,<sid>,<type>` can inject a simulated attendance record through the app layer while RC522 is paused.
 - `UITEST:<case>` can trigger sparse 24px OLED pages and local LED/buzzer feedback paths while RC522 is paused.
 - `WEATHER?`, `WEATHERTEST:<text>` and `WEATHER!` provide board-verification access to cached weather readback, test-cache writes and forced real ESP01S weather queries.
-- The upper-computer serial client now treats `UID:` and `OK:*` replies as transaction terminators, so `READ`, `ISSUE`, image writes and clear commands do not wait for avoidable timeouts.
+- The upper-computer serial client now treats `UID:`, `WEATHER:` and `OK:*` replies as transaction terminators, so `READ`, weather commands, `ISSUE`, image writes and clear commands do not wait for avoidable timeouts.
 - Firmware now links the OLED BSP and an `att_display` module; the display task shows device ID, record count, upload enable state, network state, weather placeholder, standby prompt and attendance OK/duplicate/invalid/error results.
 - ESP01S startup can write NTP time into STM32 RTC; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
 - Firmware now stores latest weather text in LittleFS `/weather.txt` and reloads it into the OLED display model at app startup.
 - Firmware feedback events now route attendance/network results to a FreeRTOS queue; L1/L2/L3/L4/L5 and TIM3_CH1 buzzer patterns indicate OK, invalid card, duplicate, fault and network-online states.
 - The upper-computer now has a device config tab that sends segmented `CFG:` commands for device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone; firmware saves those fields into `/config.bin` and reapplies display/network runtime state.
+- The upper-computer device config tab can also read cached weather, write a short test weather cache string and force one real ESP01S weather query.
 - `UPLOAD=0` disables heartbeat and pending-record upload attempts while keeping NTP time sync and weather cache/display polling active when the ESP01S network path is ready.
 
 ## Verified On Host
