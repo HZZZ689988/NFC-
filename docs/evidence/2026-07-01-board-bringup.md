@@ -1372,3 +1372,59 @@ Interpretation:
   peripheral. The remaining focus is the RC522 link itself: module orientation
   by signal name, PB10-as-ground voltage under load, continuity from PE15/PD9/
   PA0/PB13/PB15 to the module, and whether the RC522 is actually driving MISO.
+
+## RC522 With Card Present Retest
+
+Date: 2026-07-02.
+
+The previous BSP demo observation was made without a card in the RC522 field.
+The user then placed a card on the reader and the RC522 checks were repeated.
+
+Current application firmware, with card present:
+
+```text
+PING -> OK:PONG
+DIAG? -> DIAG:RC522_RAW=0xFF|RC522_VER=0xFF|CMD=0xFF|IRQ=0xFF|FIFO=0xFF|TX=0xFF|ERR=0xFF|PINS=0x59|SHARE=0|SPD=0xFF->0xFF->0xFF|RW=0|REQ=-1|TAG=0000
+```
+
+The BSP prebuilt RC522 demo was flashed again and observed with the card kept
+on the reader:
+
+```text
+program D:\c_work\BSP\Demo_RC522\build\debug\NFCAttend.elf verify reset exit -> Verified OK
+COM3 -> RC522 NFC Reader Demo Started
+```
+
+No `Card Detected` or UID line appeared during a 40 second observation window.
+
+The enhanced RC522-only diagnostic was then rebuilt/flashed and observed with
+the card present:
+
+```text
+make RC522_ONLY_DIAG=1 -j4 -> passed, text=109328 data=496 bss=46112
+program build_rc522_only/RC522_Only_Diag.elf verify reset exit -> Verified OK
+```
+
+Representative diagnostic line:
+
+```text
+RC522_ONLY:RAW=0xFF|VER=0xFF|CMD=0xFF->0xFF|IRQ=0xFF->0xFF|FIFO=0xFF->0xFF|TX=0xFF->0xFF|ERR=0xFF->0xFF|PINS=0x59->0x59|SHARE=0|SPD=0xFF->0xFF->0xFF|RW=0|MISO=0x03|DRVVER=00/00/00|DEMOLOW=00/00/00|GPIOCHK=NSS=3/SCK=3/MOSI=3/RST=3/GNDL=1|MAP=DEMO=00/00/00,H1=FF/FF/FF,H2=FF/FF/FF|PERM=H1=none,H2=none|REQ=255|TAG=0000|SCAN=255|UID=00000000
+```
+
+The production application firmware was restored afterward:
+
+```text
+program build/Demo_W25Q128.elf verify reset exit -> Verified OK
+PING -> OK:PONG
+DIAG? -> DIAG:RC522_RAW=0xFF|RC522_VER=0xFF|CMD=0xFF|IRQ=0xFF|FIFO=0xFF|TX=0xFF|ERR=0xFF|PINS=0x59|SHARE=0|SPD=0xFF->0xFF->0xFF|RW=0|REQ=-1|TAG=0000
+```
+
+Interpretation:
+
+- A card in the RF field did not change the RC522 register-level failure.
+- Reading `VersionReg` does not require a card; it should return `0x91` or
+  `0x92` from a reachable MFRC522 before `REQ/SCAN/UID` can be meaningful.
+- With the card present, `REQ=255`, `SCAN=255` and `UID=00000000` confirm that
+  no card response was decoded.
+- The BSP demo and the enhanced diagnostic agree: the reader still does not
+  provide a valid SPI response on this board connection.
