@@ -26,6 +26,7 @@ typedef enum {
     ATT_ERR_NO_CARD = -5,
     ATT_ERR_CID_MISMATCH = -6,
     ATT_ERR_NOT_READY = -7,
+    ATT_ERR_DUPLICATE = -8,
 } att_status_t;
 
 typedef enum {

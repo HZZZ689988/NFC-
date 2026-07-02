@@ -136,6 +136,45 @@ static void test_simatt_rejects_bad_arguments(void)
     require_int(g_appended_record_count == 0u, "bad SIMATT should not append record");
 }
 
+static void test_simatt_rejects_duplicate_inside_repeat_interval(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *command = "SIMATT:A1B2C3D4,1001,2\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+    g_now_sec += 30u;
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "OK:SIMATT:SEQ=1\nERR:DUPLICATE\n") == 0,
+                "duplicate SIMATT should return explicit duplicate error");
+    require_int(g_appended_record_count == 1u,
+                "duplicate SIMATT should not append a second record");
+    require_int(g_feedback_count == 2u, "SIMATT duplicate should emit feedback");
+    require_int(g_feedback_events[0] == ATT_FEEDBACK_ATTEND_OK,
+                "first SIMATT should emit OK feedback");
+    require_int(g_feedback_events[1] == ATT_FEEDBACK_ATTEND_DUPLICATE,
+                "duplicate SIMATT should emit duplicate feedback");
+}
+
+static void test_simatt_accepts_same_uid_after_repeat_interval(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *command = "SIMATT:A1B2C3D4,1001,2\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+    g_now_sec += 60u;
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "OK:SIMATT:SEQ=1\nOK:SIMATT:SEQ=2\n") == 0,
+                "SIMATT after repeat interval should be accepted");
+    require_int(g_appended_record_count == 2u,
+                "SIMATT after repeat interval should append a second record");
+}
+
 static void test_uitest_dispatches_feedback_cases(void)
 {
     reset_serial_test_state();
@@ -254,6 +293,8 @@ int main(void)
     test_discards_overlong_line();
     test_simatt_appends_pending_record();
     test_simatt_rejects_bad_arguments();
+    test_simatt_rejects_duplicate_inside_repeat_interval();
+    test_simatt_accepts_same_uid_after_repeat_interval();
     test_uitest_dispatches_feedback_cases();
     test_uitest_rejects_bad_case();
     test_weather_test_saves_and_reads_cache();

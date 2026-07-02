@@ -1075,3 +1075,87 @@ with the board for config/time/weather diagnostics, weather cache writes, forced
 real weather refresh and multi-line record listing. The temporary PC-link
 weather text was restored to the real Seniverse weather cache before ending the
 test.
+
+## Non-RC522 Requirement Sweep With Substitutes
+
+Date: 2026-07-02.
+
+RC522 real-card I/O remained intentionally paused. RC522-dependent business
+flows were substituted with `SIMATT`, no-card `READ`/`ISSUE`/`CLEAR` checks and
+host mock tests so the rest of the firmware, storage, protocol, network and
+upper-computer requirements could continue moving.
+
+Code fix found during the sweep:
+
+```text
+Before fix:
+REPEAT=60
+SIMATT:A1B2C3EB,2102,2 -> OK:SIMATT:SEQ=8
+SIMATT:A1B2C3EB,2102,2 -> OK:SIMATT:SEQ=9
+```
+
+The substitute attendance path was updated to use the same in-memory
+anti-repeat state as local NFC polling. Host tests were added for duplicate
+`SIMATT` rejection and same-UID acceptance after the repeat interval.
+
+Verification:
+
+```text
+python tools/run_verification.py -> passed
+make -j4 -> passed, text=105592 data=496 bss=45392
+arm-none-eabi-readelf -l build/Demo_W25Q128.elf -> LOAD segments R E / RW / RW, no RWE
+program build/Demo_W25Q128.elf verify reset exit -> Verified OK
+```
+
+Board anti-repeat substitute check:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8 -> OK:CFG
+SIMATT:A1B2C3EC,2201,2 -> OK:SIMATT:SEQ=10
+SIMATT:A1B2C3EC,2201,2 -> ERR:DUPLICATE
+LIST:5 ->
+REC:SEQ=10|UID=A1B2C3EC|SID=2201|NORMAL|1783014647|DEV=1|OK|UP=PENDING
+```
+
+Only one `A1B2C3EC` record was appended, so the substitute path now exercises
+the same anti-repeat requirement without RC522 hardware.
+
+Board upload-disable check:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=0|REPEAT=60|TZ=8 -> OK:CFG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=0|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+SIMATT:A1B2C3ED,2202,2 -> OK:SIMATT:SEQ=11
+LIST:5 ->
+REC:SEQ=11|UID=A1B2C3ED|SID=2202|NORMAL|1783014648|DEV=1|OK|UP=PENDING
+```
+
+After restoring upload, pending records were retried and marked done:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8 -> OK:CFG
+CFG:HOST=192.168.107.234|PORT=9000 -> OK:CFG
+CFG:WKEY=<redacted>|WLOC=30.267:120.153 -> OK:CFG
+LIST:5 ->
+REC:SEQ=10|UID=A1B2C3EC|SID=2201|NORMAL|1783014647|DEV=1|OK|UP=DONE
+REC:SEQ=11|UID=A1B2C3ED|SID=2202|NORMAL|1783014648|DEV=1|OK|UP=DONE
+WEATHER? -> WEATHER:Light 23C
+```
+
+Board protocol and no-card checks:
+
+```text
+$PING*6427 -> OK:PONG
+$PING*0000 -> ERR:CRC
+LIST:N -> ERR:ARG
+READ -> ERR:NO_CARD
+ISSUE:A1B2C3EE,2301,0,0 -> ERR:NO_CARD
+CLEAR:A1B2C3EE -> ERR:NO_CARD
+```
+
+Conclusion: with RC522 real-card I/O excluded, the remaining attendance
+business path can be substituted through `SIMATT`: local record append,
+anti-repeat rejection, pending upload retention, upload-enable gating, recovery
+upload, CRC-framed command parsing, invalid-frame rejection, bad argument
+rejection and no-card card-command rejection were all validated on the board.
+The board was restored to production config.

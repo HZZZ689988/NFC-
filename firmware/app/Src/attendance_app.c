@@ -49,6 +49,8 @@ static uint8_t s_network_ready;
 static att_display_network_state_t s_network_display_state;
 
 static uint32_t app_now(void);
+static uint8_t uid_equal(const att_uid_t *left, const att_uid_t *right);
+static uint8_t is_duplicate_uid(const att_uid_t *uid, uint32_t now);
 
 static void default_serial_send(const char *line, void *ctx)
 {
@@ -247,6 +249,14 @@ static att_status_t handle_sim_attendance(const char *payload, uint32_t *seq_out
     }
 
     uint32_t now = app_now();
+    if (is_duplicate_uid(&uid, now)) {
+        *sid_out = sid;
+        *seq_out = 0u;
+        emit_feedback(ATT_FEEDBACK_ATTEND_DUPLICATE);
+        att_display_show_attendance_duplicate(now);
+        return ATT_ERR_DUPLICATE;
+    }
+
     att_status_t status = append_attendance_record(&uid, sid,
                                                    (att_record_type_t)type_value,
                                                    now, seq_out);
@@ -255,6 +265,9 @@ static att_status_t handle_sim_attendance(const char *payload, uint32_t *seq_out
     }
 
     *sid_out = sid;
+    s_last_uid = uid;
+    s_last_uid_time = now;
+    s_last_uid_valid = 1u;
     emit_feedback(ATT_FEEDBACK_ATTEND_OK);
     att_display_show_attendance_ok(*seq_out, sid, now);
     return ATT_OK;
@@ -418,6 +431,8 @@ static void dispatch_serial_line(void)
             char response[32];
             snprintf(response, sizeof(response), "OK:SIMATT:SEQ=%lu\n", (unsigned long)seq);
             s_serial_send(response, s_serial_send_ctx);
+        } else if (status == ATT_ERR_DUPLICATE) {
+            s_serial_send("ERR:DUPLICATE\n", s_serial_send_ctx);
         } else if (status == ATT_ERR_STORAGE) {
             s_serial_send("ERR:STORAGE\n", s_serial_send_ctx);
         } else {
