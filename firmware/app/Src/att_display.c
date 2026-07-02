@@ -9,8 +9,6 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_16;
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_24;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -95,15 +93,6 @@ static void set_event(att_display_event_t event, uint32_t now_sec)
 }
 
 #if ATT_ENABLE_DISPLAY
-/*
- * The BSP GUI treats bytes above 0x7f as GBK-style two-byte character codes.
- * Keep Chinese OLED diagnostics as explicit GBK bytes so source-file encoding
- * cannot turn them into UTF-8 sequences.
- */
-static const char s_oled_test_16_hello_gbk[] = "16 \xc4\xfa\xba\xc3";
-static const char s_oled_test_16_tap_gbk[] = "16 \xc7\xeb\xcb\xa2\xbf\xa8";
-static const char s_oled_test_24_hello_gbk[] = "24 \xc4\xfa\xba\xc3";
-
 static void draw_line(uint8_t row, const char *text)
 {
     GUI_DispStringAt(text, 0, (int)row * 8);
@@ -111,17 +100,17 @@ static void draw_line(uint8_t row, const char *text)
 
 static void draw_oled_test_screen(void)
 {
-    const GUI_FONT GUI_UNI_PTR *old_font;
-
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
 
-    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_16);
-    GUI_DispStringAt(s_oled_test_16_hello_gbk, 0, 0);
-    GUI_DispStringAt(s_oled_test_16_tap_gbk, 0, 18);
-    GUI_SetFont(&GUI_FontHZ_SimSun_24);
-    GUI_DispStringAt(s_oled_test_24_hello_gbk, 0, 40);
-    GUI_SetFont(old_font);
+    draw_line(0u, "OLED ASCII TEST");
+    draw_line(1u, "0123456789");
+    draw_line(2u, "NET READY");
+    draw_line(3u, "REC:0001 UP:ON");
+    draw_line(4u, "TAP CARD");
+    draw_line(5u, "OK SEQ:123");
+    draw_line(6u, "SID:1001");
+    draw_line(7u, "ERROR? NONE");
     GUI_Update();
 }
 
