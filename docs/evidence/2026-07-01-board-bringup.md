@@ -925,3 +925,52 @@ Conclusion: the real ESP01S-to-Seniverse weather path is board-validated with
 Hangzhou coordinates and the private API key. The result is cached in
 LittleFS `/weather.txt`, read back by `WEATHER?`, and displayed through the
 existing sparse 24px weather page.
+
+## Upload Outage And Recovery Check
+
+Date: 2026-07-02.
+
+RC522 remained paused. The board was configured to a deliberately unreachable
+TCP port to validate that attendance records remain stored when upload cannot
+complete:
+
+```text
+CFG:HOST=192.168.107.234|PORT=8999 -> OK:CFG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=8999|TZ=8|SSID=abc|WLOC=30.267:120.153
+SIMATT:A1B2C3EA,2101,2 -> OK:SIMATT:SEQ=7
+LIST:3 ->
+REC:SEQ=7|UID=A1B2C3EA|SID=2101|NORMAL|1783013204|DEV=1|OK|UP=PENDING
+```
+
+The configured server port was then restored while `server/server.py` was
+running on `192.168.107.234:9000`:
+
+```text
+CFG:HOST=192.168.107.234|PORT=9000 -> OK:CFG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+```
+
+After reconnection and the next upload poll, the same record changed to
+`UP=DONE`:
+
+```text
+LIST:3 ->
+REC:SEQ=7|UID=A1B2C3EA|SID=2101|NORMAL|1783013204|DEV=1|OK|UP=PENDING
+
+LIST:3 ->
+REC:SEQ=7|UID=A1B2C3EA|SID=2101|NORMAL|1783013204|DEV=1|OK|UP=DONE
+```
+
+Server log evidence:
+
+```text
+2026-07-02T17:27:47 192.168.107.122:25088 HEARTBEAT:DEV=1
+2026-07-02T17:27:47 192.168.107.122:25088 UPLOAD:SEQ=7|UID=A1B2C3EA|SID=2101|TYPE=2|TS=1783013204|DEV=1
+2026-07-02T17:27:48 192.168.107.122:25088 UPLOAD:SEQ=7|UID=A1B2C3EA|SID=2101|TYPE=2|TS=1783013204|DEV=1
+```
+
+Conclusion: while the server was unreachable, a simulated attendance record was
+stored and remained pending. After restoring the server endpoint, the board sent
+the pending `UPLOAD:` frame, received the test server ACK, and persisted
+`UP=DONE` in LittleFS. This validates the non-RC522 offline retention and
+recovery upload path.
