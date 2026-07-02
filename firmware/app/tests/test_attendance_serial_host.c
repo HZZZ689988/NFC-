@@ -219,6 +219,34 @@ static void test_weather_test_rejects_bad_text(void)
                 "bad weather test should not update storage cache");
 }
 
+static void test_time_query_reports_valid_unix_state(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    g_now_sec = 1782999000u;
+    const char *command = "TIME?\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "TIME:1782999000|VALID=1\n") == 0,
+                "TIME? should report current valid Unix time");
+}
+
+static void test_time_query_reports_fallback_state(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    g_now_sec = 42u;
+    const char *command = "TIME?\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "TIME:42|VALID=0\n") == 0,
+                "TIME? should mark small uptime fallback as invalid RTC time");
+}
+
 int main(void)
 {
     test_dispatches_split_line();
@@ -230,6 +258,8 @@ int main(void)
     test_uitest_rejects_bad_case();
     test_weather_test_saves_and_reads_cache();
     test_weather_test_rejects_bad_text();
+    test_time_query_reports_valid_unix_state();
+    test_time_query_reports_fallback_state();
     return 0;
 }
 

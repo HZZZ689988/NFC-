@@ -79,6 +79,7 @@ class SerialClient:
                     or stripped.startswith("OK:")
                     or stripped.startswith("UID:")
                     or stripped.startswith("WEATHER:")
+                    or stripped.startswith("TIME:")
                     or stripped.startswith("ERR:")
                     or stripped == "LIST:END"
                 ):

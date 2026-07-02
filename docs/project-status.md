@@ -28,14 +28,14 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - `LIST:<count>` and `LIST:ALL` now stream stored attendance records as `REC:` lines after `LIST:COUNT`, including upload state as `UP=PENDING/DONE/FAILED`.
 - `SIMATT:<uid>,<sid>,<type>` can inject a simulated attendance record through the app layer while RC522 is paused.
 - `UITEST:<case>` can trigger sparse 24px OLED pages and local LED/buzzer feedback paths while RC522 is paused.
-- `WEATHER?`, `WEATHERTEST:<text>` and `WEATHER!` provide board-verification access to cached weather readback, test-cache writes and forced real ESP01S weather queries.
-- The upper-computer serial client now treats `UID:`, `WEATHER:` and `OK:*` replies as transaction terminators, so `READ`, weather commands, `ISSUE`, image writes and clear commands do not wait for avoidable timeouts.
+- `WEATHER?`, `WEATHERTEST:<text>`, `WEATHER!` and `TIME?` provide board-verification access to cached weather readback, test-cache writes, forced real ESP01S weather queries and app time-source state.
+- The upper-computer serial client now treats `UID:`, `WEATHER:`, `TIME:` and `OK:*` replies as transaction terminators, so `READ`, weather/time commands, `ISSUE`, image writes and clear commands do not wait for avoidable timeouts.
 - Firmware now links the OLED BSP and an `att_display` module; the display task shows device ID, record count, upload enable state, network state, weather placeholder, standby prompt and attendance OK/duplicate/invalid/error results.
 - ESP01S startup can write NTP time into STM32 RTC; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
 - Firmware now stores latest weather text in LittleFS `/weather.txt` and reloads it into the OLED display model at app startup.
 - Firmware feedback events now route attendance/network results to a FreeRTOS queue; L1/L2/L3/L4/L5 and TIM3_CH1 buzzer patterns indicate OK, invalid card, duplicate, fault and network-online states.
 - The upper-computer now has a device config tab that sends segmented `CFG:` commands for device id, work mode, upload enable, anti-repeat interval, WiFi, server, weather and timezone; firmware saves those fields into `/config.bin` and reapplies display/network runtime state.
-- The upper-computer device config tab can also read cached weather, write a short test weather cache string and force one real ESP01S weather query.
+- The upper-computer device config tab can also read cached weather, write a short test weather cache string, force one real ESP01S weather query and read the current device time source.
 - `UPLOAD=0` disables heartbeat and pending-record upload attempts while keeping NTP time sync and weather cache/display polling active when the ESP01S network path is ready.
 
 ## Verified On Host
@@ -48,7 +48,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - ARM GCC compile-only checks also passed for the same protocol, serial, NFC and network test sources.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked and no warning lines in the build log.
 - `arm-none-eabi-readelf -l build/Demo_W25Q128.elf` shows the Flash `PT_LOAD` segment as `R E` and RAM `PT_LOAD` segments as `RW`, with no `RWE`/`RWX` load segment.
-- STM32 firmware size after this slice: `text=105096`, `data=496`, `bss=44360`.
+- STM32 firmware size after this slice: `text=105208`, `data=496`, `bss=44360`.
 
 ## Board Validated
 
@@ -60,6 +60,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - `WEATHERTEST:Sunny 20C` creates/updates `/weather.txt`; `WEATHER?` reads it back as `WEATHER:Sunny 20C` after DAP reset.
 - ESP01S connects WiFi, syncs NTP into RTC, connects TCP to `server/server.py` and sends heartbeat.
 - After a DAP reset, a pre-NTP simulated attendance record used RTC-derived Unix seconds instead of RTOS uptime fallback.
+- `TIME?` reports the app time source over `COM3`; current board result was `TIME:1783011177|VALID=1`.
 - Simulated attendance upload reaches `server/server.py`, receives `ACK:UPLOAD:<seq>` and persists `UP=DONE` in LittleFS.
 - `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands are accepted over `COM3` and route through the same display/feedback callbacks as runtime events.
 - Physical observation confirmed the sparse 24px OLED pages, L1-L5 LED mapping and TIM3_CH1 PB4 buzzer feedback for the simulated `UITEST` cases.

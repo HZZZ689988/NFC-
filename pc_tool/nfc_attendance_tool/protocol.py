@@ -117,6 +117,10 @@ def build_weather_force_query() -> str:
     return "WEATHER!\n"
 
 
+def build_time_query() -> str:
+    return "TIME?\n"
+
+
 def build_clear(uid_hex: str) -> str:
     return f"CLEAR:{normalize_uid(uid_hex)}\n"
 

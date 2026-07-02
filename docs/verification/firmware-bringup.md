@@ -46,6 +46,7 @@ updated: 2026-07-02
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
 - [x] Host tests verify `UPLOAD=0` skips heartbeat/upload while preserving NTP and weather polling.
 - [x] Host tests cover `WEATHER?`, `WEATHERTEST:<text>`, compact weather text and the sparse 24px OLED weather page.
+- [x] Host tests cover `TIME?` valid-Unix and fallback-time serial responses.
 - [x] Feedback callback paths and full STM32 firmware compile with LED/MIDI buzzer integration.
 - [x] Protocol and Python tests cover `CFG:` config command construction, persistence and runtime apply callback paths.
 - [x] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
@@ -84,6 +85,7 @@ updated: 2026-07-02
 - [x] ESP01S connects WiFi.
 - [x] NTP sync updates RTC.
 - [x] RTC-derived attendance timestamps use valid Unix seconds immediately after DAP reset and before a fresh NTP sync.
+- [x] USART1 `TIME?` reports the current app time source and valid/fallback state.
 - [ ] RTC keeps valid time across full power-loss/VBAT conditions.
 - [x] ESP01S TCP connects to `server/server.py`.
 - [x] TCP upload reaches `server/server.py`.

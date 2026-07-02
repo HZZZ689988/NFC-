@@ -16,6 +16,7 @@ from nfc_attendance_tool.protocol import (
     build_config_commands,
     build_crc_frame,
     build_issue,
+    build_time_query,
     build_weather_force_query,
     build_weather_query,
     build_weather_test,
@@ -81,6 +82,7 @@ def test_build_weather_commands() -> None:
     assert build_weather_query() == "WEATHER?\n"
     assert build_weather_test(" Sunny 20C ") == "WEATHERTEST:Sunny 20C\n"
     assert build_weather_force_query() == "WEATHER!\n"
+    assert build_time_query() == "TIME?\n"
 
 
 def test_build_weather_test_rejects_ambiguous_text() -> None:
@@ -193,6 +195,18 @@ def test_serial_transact_accepts_weather_response() -> None:
 
     assert fake.writes == [b"WEATHER?\n"]
     assert lines == ["WEATHER:Sunny 20C"]
+
+
+def test_serial_transact_accepts_time_response() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    fake.responses = ["TIME:1782999000|VALID=1"]
+    client._serial = fake  # type: ignore[attr-defined]
+
+    lines = client.transact("TIME?\n", timeout=0.2)
+
+    assert fake.writes == [b"TIME?\n"]
+    assert lines == ["TIME:1782999000|VALID=1"]
 
 
 def test_success_response_accepts_ok_prefix() -> None:

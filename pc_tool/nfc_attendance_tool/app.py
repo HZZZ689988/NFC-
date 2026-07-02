@@ -26,6 +26,7 @@ from .protocol import (
     build_issue,
     build_list,
     build_read,
+    build_time_query,
     build_update_image,
     build_weather_force_query,
     build_weather_query,
@@ -340,12 +341,15 @@ class AttendanceApp(tk.Tk):
         self.write_weather_test_btn.pack(side=tk.LEFT, padx=8)
         self.force_weather_btn = ttk.Button(actions, text="强制查天气", command=self.force_weather_query)
         self.force_weather_btn.pack(side=tk.LEFT)
+        self.query_time_btn = ttk.Button(actions, text="读取时间", command=self.query_time)
+        self.query_time_btn.pack(side=tk.LEFT, padx=8)
         self.serial_buttons.extend([
             self.query_config_btn,
             self.write_config_btn,
             self.query_weather_btn,
             self.write_weather_test_btn,
             self.force_weather_btn,
+            self.query_time_btn,
         ])
 
     def build_log_tab(self) -> None:
@@ -573,6 +577,9 @@ class AttendanceApp(tk.Tk):
 
     def force_weather_query(self) -> None:
         self.run_serial_job("强制查天气", [build_weather_force_query()], expect_multi=True)
+
+    def query_time(self) -> None:
+        self.run_serial_job("读取时间", [build_time_query()], expect_multi=True)
 
     def run_serial_job(
         self,

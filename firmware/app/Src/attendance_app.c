@@ -21,6 +21,7 @@
 #define ATT_NETWORK_TIME_SYNC_INTERVAL_SEC  3600u
 #define ATT_NETWORK_WEATHER_INTERVAL_SEC    1800u
 #define ATT_WEATHER_TEXT_LEN                32u
+#define ATT_VALID_UNIX_MIN                  1609459200u
 
 static att_device_config_t s_config;
 static uint32_t s_next_seq = 1u;
@@ -370,6 +371,16 @@ static void send_weather_response(const char *weather)
     s_serial_send(response, s_serial_send_ctx);
 }
 
+static void send_time_response(void)
+{
+    uint32_t now = app_now();
+    char response[64];
+    snprintf(response, sizeof(response), "TIME:%lu|VALID=%u\n",
+             (unsigned long)now,
+             (unsigned int)(now >= ATT_VALID_UNIX_MIN ? 1u : 0u));
+    s_serial_send(response, s_serial_send_ctx);
+}
+
 static att_status_t apply_runtime_config(const att_device_config_t *config, void *ctx)
 {
     (void)ctx;
@@ -442,6 +453,8 @@ static void dispatch_serial_line(void)
         } else {
             s_serial_send("ERR:WEATHER\n", s_serial_send_ctx);
         }
+    } else if (parsed == ATT_OK && strcmp(payload, "TIME?") == 0) {
+        send_time_response();
     } else {
         (void)att_protocol_handle_line(s_serial_line, s_serial_send, s_serial_send_ctx);
     }

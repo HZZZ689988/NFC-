@@ -796,3 +796,38 @@ Conclusion: LittleFS `/weather.txt` creation/update, serial readback, startup
 reload and the compact 24px OLED weather page are board-validated. The real
 ESP01S weather API path still needs a valid `WKEY` before it can be marked as
 hardware-validated.
+
+## Time Source Diagnostic Command
+
+Date: 2026-07-02.
+
+RC522 remained paused. A `TIME?` serial command was added so DAP-reset and later
+full power-loss/VBAT RTC checks can read the same application time source used
+for attendance records.
+
+Host verification:
+
+```text
+python firmware/app/tests/run_host_tests.py -> passed
+python pc_tool/tests/test_core.py -> passed
+python -m compileall pc_tool server -> passed
+make -j4 -> passed, text=105208 data=496 bss=44360
+```
+
+Flash verification:
+
+```text
+program build/Demo_W25Q128.elf verify reset exit -> Verified OK
+```
+
+Board command pass:
+
+```text
+TIME? -> TIME:1783011177|VALID=1
+WEATHER? -> WEATHER:Sunny 20C
+```
+
+Conclusion: `TIME?` now reports current Unix seconds plus a validity flag.
+`VALID=1` means the app time source is RTC/NTP-derived Unix time; `VALID=0`
+would indicate RTOS uptime fallback. This makes the remaining full power-loss
+/ VBAT RTC retention test directly observable over `COM3`.

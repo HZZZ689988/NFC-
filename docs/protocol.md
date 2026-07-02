@@ -39,6 +39,7 @@ UITEST:OK
 WEATHER?
 WEATHERTEST:Sunny 20C
 WEATHER!
+TIME?
 CFG?
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
 CFG:SSID=wifi-name
@@ -62,6 +63,7 @@ OK:SIMATT:SEQ=13
 OK:UITEST
 WEATHER:Sunny 20C
 OK:WEATHERTEST
+TIME:1783011177|VALID=1
 ERR:NO_CARD
 ERR:UID_MISMATCH
 ERR:CRC
@@ -103,6 +105,11 @@ page and returns `OK:WEATHERTEST`. `WEATHER!` forces one ESP01S weather query
 when WiFi/network is ready and weather config is present; it returns
 `WEATHER:<text>` on success or `ERR:NOT_READY` / `ERR:WEATHER` on failure. The
 upper-computer device-config tab exposes all three weather diagnostic commands.
+
+`TIME?` returns the application's current time source as `TIME:<unix>|VALID=<0|1>`.
+`VALID=1` means the value is at or after 2021-01-01 and should be treated as
+RTC/NTP-derived Unix time. `VALID=0` means the firmware is still using the small
+RTOS uptime fallback. The upper-computer device-config tab exposes this query.
 
 ## Device Config
 
