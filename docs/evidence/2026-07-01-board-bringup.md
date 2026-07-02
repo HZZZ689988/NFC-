@@ -511,3 +511,58 @@ Current decision: keep the production status page in ASCII for now, and use
 `OLEDTEST` as a known-good Chinese diagnostic. Full Chinese business pages
 should be enabled only after generating a GBK font subset that covers the actual
 attendance UI words.
+
+## USART1 And ESP01S Regression, RC522 Paused
+
+Date: 2026-07-02.
+
+Scope: RC522 was intentionally not tested. This pass verified the non-RC522
+paths after switching the OLED production page to sparse 24px text.
+
+Finding: `COM3` receive initially answered short `PING` commands, then stopped
+responding after `CFG?`. The failure was reproduced after reset. The firmware
+was changed to:
+
+- avoid the UART driver's asynchronous `HAL_UART_AbortReceive_IT()` startup
+  race before `HAL_UARTEx_ReceiveToIdle_IT()`;
+- increase `serialTask` stack from 2 KB to 4 KB for protocol formatting and
+  storage calls;
+- enable FreeRTOS stack overflow checking.
+
+Validation after flashing:
+
+```text
+OpenOCD: Programming Finished, Verified OK, Resetting Target
+PING -> OK:PONG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+PING -> OK:PONG
+LIST:1 -> LIST:COUNT=0 / LIST:END
+LIST:ALL -> LIST:COUNT=0 / LIST:END
+OLEDTEST -> OK:OLEDTEST
+PING -> OK:PONG
+```
+
+Network validation used the local test server on `192.168.107.234:9000`:
+
+```text
+python server.py --host 0.0.0.0 --port 9000
+```
+
+Board serial output after reset:
+
+```text
+[ESP01S] NTP sync success
+RTC synced from ESP01S NTP
+ESP01S network ready
+```
+
+Server log evidence:
+
+```text
+2026-07-02T12:41:42  192.168.107.122:8443  HEARTBEAT:DEV=1
+```
+
+Conclusion: DAP flashing, USART1 bidirectional command handling, W25Q128-backed
+empty record listing, OLED `OLEDTEST`, ESP01S WiFi/NTP/RTC/TCP startup and
+heartbeat-to-server are validated. Real attendance upload remains blocked until
+RC522 card input is resumed or a synthetic record injection path is added.

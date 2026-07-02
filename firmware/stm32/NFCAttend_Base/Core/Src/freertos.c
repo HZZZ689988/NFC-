@@ -123,7 +123,7 @@ const osThreadAttr_t ledTask_attributes = {
 osThreadId_t serialTaskHandle;
 const osThreadAttr_t serialTask_attributes = {
   .name = "serialTask",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 

@@ -1,7 +1,7 @@
 ---
 type: project-status
 project: nfc-attendance
-updated: 2026-06-30
+updated: 2026-07-02
 status: in-progress
 ---
 
@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in full-feature firmware integration and host-verification mode. The STM32 base now links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Card account reads, image-card block writes, serial attendance record streaming, OLED status pages, RTC/weather integration, LED/buzzer feedback events and `CFG:` config writes are implemented in firmware, but hardware validation is still pending.
+The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, W25Q128/LittleFS config, empty record listing, sparse 24px OLED test display, ESP01S WiFi/NTP/RTC/TCP startup and heartbeat-to-server.
 
 ## Implemented
 
@@ -44,24 +44,32 @@ The project is in full-feature firmware integration and host-verification mode. 
 - ARM GCC compile-only checks also passed for the same protocol, serial, NFC and network test sources.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked and no warning lines in the build log.
 - `arm-none-eabi-readelf -l build/Demo_W25Q128.elf` shows the Flash `PT_LOAD` segment as `R E` and RAM `PT_LOAD` segments as `RW`, with no `RWE`/`RWX` load segment.
-- STM32 firmware size after this slice: `text=99456`, `data=496`, `bss=46480`.
+- STM32 firmware size after this slice: `text=103096`, `data=496`, `bss=44360`.
+
+## Board Validated
+
+- CMSIS-DAP flashing and verify/reset.
+- USART1 over `COM3` responds to `PING`, `CFG?`, `LIST:1`, `LIST:ALL` and `OLEDTEST` after repeated commands.
+- W25Q128/LittleFS mounts and loads persistent `/config.bin`.
+- Empty board storage returns `LIST:COUNT=0` and `LIST:END`.
+- OLED initializes and displays the sparse 24px `OLEDTEST` page.
+- ESP01S connects WiFi, syncs NTP into RTC, connects TCP to `server/server.py` and sends heartbeat.
 
 ## Not Yet Hardware Validated
 
-- LittleFS mount/format/read/write on W25Q128.
 - RC522 real-card UID forced-consistency issuing.
 - RC522 card account block read/write with CRC16 and UID consistency on a real card.
 - RC522 image-card write flow: 24 portrait blocks, 10 name blocks, 10 department blocks and `UPDATEIMG`.
-- USART1 `LIST:N` / `LIST:ALL` record streaming against real persistent records.
-- USART1 `CFG:` config writes to `/config.bin` and resulting ESP01S/display runtime config on the real board.
-- ESP01S WiFi, NTP-to-RTC, weather query/cache, heartbeat and TCP upload.
+- USART1 `LIST:<count>` / `LIST:ALL` record streaming after real persistent attendance records exist.
+- ESP01S real attendance `UPLOAD:` plus `ACK:UPLOAD:<seq>` round trip.
+- Weather query/cache.
 - RTC retention and RTC-derived attendance timestamps on real LSE/VBAT conditions.
-- OLED page display on real I2C1 hardware, including standby, attendance result, network state and weather pages.
+- OLED normal runtime pages, including standby, attendance result, network state and weather pages.
 - LED and TIM3_CH1 buzzer feedback on PE8-PE12/PB4 for attendance and network state events.
 
 ## Main Risks
 
 - Some original BSP comments are mojibake, but the C interfaces are usable.
-- Network ACK parsing is host-tested. Firmware marks records uploaded only after receiving `ACK:UPLOAD:<seq>`, but this path still needs board-side ESP01S/TCP validation.
-- ESP01S startup is build-linked and scheduled, but WiFi/TCP/NTP/weather behavior still needs board-side evidence.
+- Network ACK parsing is host-tested. Firmware marks records uploaded only after receiving `ACK:UPLOAD:<seq>`, but this path still needs board-side validation with a real or injected attendance record.
+- RC522 register communication is paused and remains the main blocker for the full attendance loop.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.

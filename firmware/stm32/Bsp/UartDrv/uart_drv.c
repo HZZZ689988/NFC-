@@ -239,9 +239,11 @@ void UartDrv_StartRecv(UartDrv_t *pDrv)
     if (pDrv == NULL || !pDrv->initialized)
         return;
 
-    /* 第1步: 先启动一次普通接收再中止,清除之前可能残留的状态 */
-    HAL_UART_Receive_IT(pDrv->pUartHandle, pDrv->rxData.rx_buf, UART_DRV_RX_BUF_SIZE - 1);
-    HAL_UART_AbortReceive_IT(pDrv->pUartHandle);
+    /* Clear any stale receive state before enabling ReceiveToIdle.
+     * HAL_UART_AbortReceive_IT() is asynchronous; starting ReceiveToIdle
+     * immediately after it can leave RX disabled because HAL returns BUSY. */
+    HAL_UART_AbortReceive(pDrv->pUartHandle);
+    __HAL_UART_CLEAR_OREFLAG(pDrv->pUartHandle);
 
     /* 第2步: 启动空闲中断接收(真正的工作模式) */
     HAL_UARTEx_ReceiveToIdle_IT(pDrv->pUartHandle, pDrv->rxData.rx_buf, UART_DRV_RX_BUF_SIZE - 1);

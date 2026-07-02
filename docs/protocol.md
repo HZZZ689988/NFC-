@@ -32,7 +32,7 @@ IMGN00:HEX32
 IMGD00:HEX32
 UPDATEIMG
 CLEAR:UID
-LIST:N
+LIST:<count>
 LIST:ALL
 CFG?
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
@@ -73,7 +73,9 @@ bit0 `NSS`, bit1 `SCK`, bit2 `MOSI`, bit3 `MISO`, bit4 `RST`, bit5 W25Q128
 select pin on this board. `RC522_VER=0x00` or `0xFF` means the MCU is not
 communicating with the RC522 over the configured wiring.
 
-`LIST:N` returns the newest `N` records. `LIST:ALL` returns every stored record in storage order. Bad list counts return `ERR:ARG` without sending a partial list.
+`LIST:<count>` returns the newest `<count>` records, for example `LIST:1`.
+`LIST:ALL` returns every stored record in storage order. Bad list counts, including
+the literal placeholder `LIST:N`, return `ERR:ARG` without sending a partial list.
 
 ## Device Config
 
