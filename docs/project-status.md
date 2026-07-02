@@ -78,7 +78,6 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - RC522 real-card UID forced-consistency issuing.
 - RC522 card account block read/write with CRC16 and UID consistency on a real card.
 - RC522 image-card write flow: 24 portrait blocks, 10 name blocks, 10 department blocks and `UPDATEIMG`.
-- USART1 `LIST:<count>` / `LIST:ALL` record streaming after real persistent attendance records exist.
 - ESP01S real RC522-driven attendance `UPLOAD:` plus `ACK:UPLOAD:<seq>` round trip.
 - Strict RTC retention timing proof before fresh NTP sync after full power-loss/VBAT conditions.
 - Physical observation of LED and TIM3_CH1 PB4 feedback after real RC522 card events.

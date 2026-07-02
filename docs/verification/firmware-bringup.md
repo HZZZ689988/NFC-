@@ -57,6 +57,7 @@ updated: 2026-07-02
 - [x] `python tools/run_verification.py` runs Python compile checks, upper-computer/server tests, native C host tests and `git diff --check`.
 - [x] `python tools/run_verification.py --firmware-build` additionally runs STM32 clean build and ELF segment permission checks.
 - [x] `DIAG?` protocol routing is host-tested for RC522 register diagnostic output.
+- [x] Upper-computer tests cover SQLite people, issue logs, lost-card marks, attendance import, upload-state refresh, schema migration and UTF-8-SIG CSV export.
 
 ## Hardware
 
@@ -69,7 +70,7 @@ updated: 2026-07-02
 - [x] RC522 platform init reconfigures the selected RC522 GPIOs after peripheral init.
 - [ ] RC522 register read returns a valid MFRC522 version value.
 - [ ] RC522 reads UID.
-- [ ] `ISSUE` rejects no-card.
+- [x] `ISSUE` and `CLEAR` reject no-card over `COM3`.
 - [ ] `ISSUE` rejects mismatched UID.
 - [ ] `ISSUE` writes matching card.
 - [ ] Issued card account block can be read back with matching UID, SID, points, card type and CRC16.
@@ -82,6 +83,7 @@ updated: 2026-07-02
 - [x] `CFG:` WiFi/server/weather/timezone changes are reflected in ESP01S startup behavior after config write.
 - [x] USART1 `LIST:1` and `LIST:ALL` return `LIST:COUNT=0` and `LIST:END` on empty board storage.
 - [x] USART1 `LIST:<count>` streams stored `REC:` lines after simulated attendance records exist.
+- [x] Upper-computer `SerialClient` imports live `LIST:5` board records into SQLite and exports CSV with upload state.
 - [x] ESP01S connects WiFi.
 - [x] NTP sync updates RTC.
 - [x] RTC-derived attendance timestamps use valid Unix seconds immediately after DAP reset and before a fresh NTP sync.
@@ -97,7 +99,7 @@ updated: 2026-07-02
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real RC522 card events.
 - [x] OLED displays ESP01S network state and cached weather text through the sparse 24px weather page.
 - [x] LittleFS `/weather.txt` is created/updated through `WEATHERTEST:<text>` and reloaded after DAP reset.
-- [ ] ESP01S real weather API query with configured `WKEY` updates `/weather.txt`.
+- [x] ESP01S real weather API query with configured `WKEY` updates `/weather.txt`.
 - [x] L1 indicates simulated attendance OK through `UITEST`, confirmed by physical observation.
 - [x] L2 indicates simulated invalid-card rejection through `UITEST`, confirmed by physical observation.
 - [x] L3 indicates simulated duplicate attendance skip through `UITEST`, confirmed by physical observation.
