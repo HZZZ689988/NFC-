@@ -16,6 +16,8 @@ static att_status_t g_diag_status = ATT_OK;
 static att_card_diag_t g_diag;
 static att_status_t g_issue_status = ATT_OK;
 static att_status_t g_clear_status = ATT_OK;
+static att_status_t g_image_status = ATT_OK;
+static att_status_t g_update_image_status = ATT_OK;
 static att_person_t g_last_person;
 static att_uid_t g_last_clear_uid;
 static att_record_t g_records[3];
@@ -77,6 +79,8 @@ static void reset_mocks(void)
     g_diag.tag_type[1] = 0x00u;
     g_issue_status = ATT_OK;
     g_clear_status = ATT_OK;
+    g_image_status = ATT_OK;
+    g_update_image_status = ATT_OK;
     memset(g_records, 0, sizeof(g_records));
     g_record_count = 0u;
     g_issue_calls = 0u;
@@ -320,6 +324,30 @@ static void test_image_block_command_calls_card_writer(void)
                 "image block should parse hex payload");
 }
 
+static void test_image_block_rejects_out_of_range_index(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("IMGN10:00112233445566778899AABBCCDDEEFF", capture_send, &capture);
+
+    require_int(status == ATT_ERR_INVALID_ARG, "image block index should return invalid arg");
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0, "bad image block index should report argument error");
+    require_int(g_image_calls == 0u, "bad image block index should not call card writer");
+}
+
+static void test_image_block_rejects_bad_hex(void)
+{
+    reset_mocks();
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("IMGA23:00112233445566778899AABBCCDDEEFG", capture_send, &capture);
+
+    require_int(status == ATT_ERR_INVALID_ARG, "bad image hex should return invalid arg");
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0, "bad image hex should report argument error");
+    require_int(g_image_calls == 0u, "bad image hex should not call card writer");
+}
+
 static void test_update_image_calls_card_finish(void)
 {
     reset_mocks();
@@ -330,6 +358,19 @@ static void test_update_image_calls_card_finish(void)
     require_int(status == ATT_OK, "UPDATEIMG should return ATT_OK");
     require_int(strcmp(capture.text, "OK:UPDATEIMG\n") == 0, "UPDATEIMG should acknowledge update");
     require_int(g_update_image_calls == 1u, "UPDATEIMG should call card finish");
+}
+
+static void test_update_image_maps_not_ready(void)
+{
+    reset_mocks();
+    g_update_image_status = ATT_ERR_NOT_READY;
+    send_capture_t capture = {0};
+
+    att_status_t status = att_protocol_handle_line("UPDATEIMG", capture_send, &capture);
+
+    require_int(status == ATT_ERR_NOT_READY, "UPDATEIMG should return not-ready status");
+    require_int(strcmp(capture.text, "ERR:NOT_READY\n") == 0, "UPDATEIMG should map incomplete image session");
+    require_int(g_update_image_calls == 1u, "UPDATEIMG should call card finish before mapping not-ready");
 }
 
 int main(void)
@@ -348,7 +389,10 @@ int main(void)
     test_config_set_saves_and_applies_config();
     test_config_set_rejects_bad_value();
     test_image_block_command_calls_card_writer();
+    test_image_block_rejects_out_of_range_index();
+    test_image_block_rejects_bad_hex();
     test_update_image_calls_card_finish();
+    test_update_image_maps_not_ready();
     return 0;
 }
 
@@ -416,13 +460,13 @@ att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t inde
     g_last_image_index = index;
     memcpy(g_last_image_block, data, sizeof(g_last_image_block));
     g_image_calls++;
-    return ATT_OK;
+    return g_image_status;
 }
 
 att_status_t att_card_finish_image_update(void)
 {
     g_update_image_calls++;
-    return ATT_OK;
+    return g_update_image_status;
 }
 
 void att_display_show_oled_test(void)

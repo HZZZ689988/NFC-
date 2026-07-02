@@ -17,6 +17,7 @@ from nfc_attendance_tool.protocol import (
     build_clear,
     build_config_commands,
     build_crc_frame,
+    build_image_block,
     build_issue,
     build_time_query,
     build_weather_force_query,
@@ -114,6 +115,33 @@ def test_image_blocks_shape() -> None:
     commands = chunk_commands("IMGN", blocks.name)
     assert commands[0].startswith("IMGN00:")
     assert commands[-1].startswith("IMGN09:")
+
+
+def test_image_command_validation() -> None:
+    assert build_image_block("IMGA", 23, "00112233445566778899AABBCCDDEEFF") == (
+        "IMGA23:00112233445566778899AABBCCDDEEFF\n"
+    )
+
+    for prefix, index, hex32 in (
+        ("IMGA", 24, "00112233445566778899AABBCCDDEEFF"),
+        ("IMGN", 10, "00112233445566778899AABBCCDDEEFF"),
+        ("IMGD", 10, "00112233445566778899AABBCCDDEEFF"),
+        ("BAD", 0, "00112233445566778899AABBCCDDEEFF"),
+        ("IMGA", 0, "00112233445566778899AABBCCDDEEFG"),
+    ):
+        try:
+            build_image_block(prefix, index, hex32)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid image block command was accepted")
+
+    try:
+        chunk_commands("IMGA", [b"short"])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("short image block was accepted")
 
 
 def test_record_parse() -> None:

@@ -38,7 +38,7 @@ updated: 2026-07-02
 - [x] Resolve known W25QXX build warning: unused local variable `temp` in `W25QXX_Init`.
 - [x] ARM GCC compile-only checks pass for `test_att_protocol_host.c`, `test_attendance_serial_host.c`, `test_attendance_nfc_host.c`, `test_att_network_host.c` and `test_attendance_network_host.c`.
 - [x] `LIST:N` logic has compile-checked tests for streaming newest records and rejecting invalid list counts before sending partial list output.
-- [x] `IMGAxx`, `IMGNxx`, `IMGDxx` and `UPDATEIMG` protocol routing has compile-checked tests.
+- [x] `IMGAxx`, `IMGNxx`, `IMGDxx` and `UPDATEIMG` protocol routing has compile-checked tests, including out-of-range index, bad hex and `ERR:NOT_READY` mapping.
 - [x] Python serial-client tests cover `UID:` and `OK:*` transaction terminators.
 - [x] `att_display.c` and `attendance_app.c` compile as ARM Cortex-M4 objects with display calls linked.
 - [x] `firmware/app/tests/test_att_display_host.c` covers the display status model with a host GUI stub.
@@ -76,7 +76,7 @@ updated: 2026-07-02
 - [ ] Issued card account block can be read back with matching UID, SID, points, card type and CRC16.
 - [ ] Invalid account block CRC is rejected without appending an attendance record.
 - [ ] `IMGA00..23`, `IMGN00..09`, `IMGD00..09` write to a real image card and `UPDATEIMG` returns success.
-- [ ] `UPDATEIMG` returns `ERR:NOT_READY` when any image block is missing.
+- [x] `UPDATEIMG` returns `ERR:NOT_READY` when any image block is missing in host/protocol tests.
 - [ ] Image-card block contents can be read back from RC522 and match upper-computer generated bitmap data.
 - [x] USART1 responds to `PING` and `CFG?`.
 - [x] USART1 accepts segmented `CFG:` writes and persists `/config.bin` on W25Q128/LittleFS.

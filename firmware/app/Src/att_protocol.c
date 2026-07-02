@@ -10,6 +10,9 @@
 #include "att_display.h"
 #include "att_storage.h"
 
+#define ATT_PROTOCOL_IMAGE_PORTRAIT_BLOCKS 24u
+#define ATT_PROTOCOL_IMAGE_TEXT_BLOCKS     10u
+
 static att_protocol_config_apply_fn s_config_apply;
 static void *s_config_apply_ctx;
 
@@ -552,6 +555,14 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
         }
 
         uint8_t index = (uint8_t)(((uint8_t)(payload[4] - '0') * 10u) + (uint8_t)(payload[5] - '0'));
+        uint8_t max_index = area == ATT_CARD_IMAGE_PORTRAIT
+                                ? (uint8_t)(ATT_PROTOCOL_IMAGE_PORTRAIT_BLOCKS - 1u)
+                                : (uint8_t)(ATT_PROTOCOL_IMAGE_TEXT_BLOCKS - 1u);
+        if (index > max_index) {
+            send("ERR:ARG\n", ctx);
+            return ATT_ERR_INVALID_ARG;
+        }
+
         uint8_t block[16];
         if (parse_hex_block16(payload + 7, block) != 0) {
             send("ERR:ARG\n", ctx);
