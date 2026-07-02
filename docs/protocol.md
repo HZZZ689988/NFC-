@@ -35,6 +35,7 @@ CLEAR:UID
 LIST:<count>
 LIST:ALL
 SIMATT:A1B2C3D4,1001,2
+UITEST:OK
 CFG?
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
 CFG:SSID=wifi-name
@@ -55,6 +56,7 @@ OK:IMG
 OK:UPDATEIMG
 OK:CLEAR
 OK:SIMATT:SEQ=13
+OK:UITEST
 ERR:NO_CARD
 ERR:UID_MISMATCH
 ERR:CRC
@@ -84,6 +86,10 @@ the literal placeholder `LIST:N`, return `ERR:ARG` without sending a partial lis
 paused. It appends a pending attendance record through the application layer,
 updates the display/feedback path and schedules immediate network upload. The
 record type is `0` for `IN`, `1` for `OUT` and `2` for `NORMAL`.
+
+`UITEST:<case>` is a board-verification command for OLED and local feedback
+while RC522 is paused. Supported cases are `READY`, `OK`, `DUP`, `INVALID`,
+`ERROR`, `NETOK` and `NETERR`.
 
 ## Device Config
 

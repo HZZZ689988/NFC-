@@ -223,6 +223,53 @@ static att_status_t handle_sim_attendance(const char *payload, uint32_t *seq_out
     att_display_show_attendance_ok(*seq_out, sid, now);
     return ATT_OK;
 }
+
+static att_status_t handle_ui_test(const char *payload)
+{
+    static const char prefix[] = "UITEST:";
+    if (payload == NULL || strncmp(payload, prefix, sizeof(prefix) - 1u) != 0) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    const char *mode = payload + sizeof(prefix) - 1u;
+    uint32_t now = app_now();
+
+    if (strcmp(mode, "READY") == 0) {
+        att_display_show_ready(now);
+        return ATT_OK;
+    }
+    if (strcmp(mode, "OK") == 0) {
+        emit_feedback(ATT_FEEDBACK_ATTEND_OK);
+        att_display_show_attendance_ok(s_next_seq, 1001u, now);
+        return ATT_OK;
+    }
+    if (strcmp(mode, "DUP") == 0) {
+        emit_feedback(ATT_FEEDBACK_ATTEND_DUPLICATE);
+        att_display_show_attendance_duplicate(now);
+        return ATT_OK;
+    }
+    if (strcmp(mode, "INVALID") == 0) {
+        emit_feedback(ATT_FEEDBACK_CARD_INVALID);
+        att_display_show_attendance_invalid(now);
+        return ATT_OK;
+    }
+    if (strcmp(mode, "ERROR") == 0) {
+        emit_feedback(ATT_FEEDBACK_ERROR);
+        att_display_show_error("TEST", now);
+        return ATT_OK;
+    }
+    if (strcmp(mode, "NETOK") == 0) {
+        set_network_state(ATT_DISPLAY_NET_ONLINE);
+        return ATT_OK;
+    }
+    if (strcmp(mode, "NETERR") == 0) {
+        set_network_state(ATT_DISPLAY_NET_ERROR);
+        return ATT_OK;
+    }
+
+    return ATT_ERR_INVALID_ARG;
+}
+
 static att_status_t apply_runtime_config(const att_device_config_t *config, void *ctx)
 {
     (void)ctx;
@@ -251,8 +298,8 @@ static void dispatch_serial_line(void)
     s_serial_line[s_serial_line_len] = '\0';
 
     char payload[ATT_SERIAL_LINE_MAX + 1u];
-    if (att_protocol_parse_frame(s_serial_line, payload, sizeof(payload)) == ATT_OK &&
-        strncmp(payload, "SIMATT:", 7) == 0) {
+    att_status_t parsed = att_protocol_parse_frame(s_serial_line, payload, sizeof(payload));
+    if (parsed == ATT_OK && strncmp(payload, "SIMATT:", 7) == 0) {
         uint32_t seq = 0u;
         uint32_t sid = 0u;
         att_status_t status = handle_sim_attendance(payload, &seq, &sid);
@@ -265,6 +312,9 @@ static void dispatch_serial_line(void)
         } else {
             s_serial_send("ERR:ARG\n", s_serial_send_ctx);
         }
+    } else if (parsed == ATT_OK && strncmp(payload, "UITEST:", 7) == 0) {
+        att_status_t status = handle_ui_test(payload);
+        s_serial_send(status == ATT_OK ? "OK:UITEST\n" : "ERR:ARG\n", s_serial_send_ctx);
     } else {
         (void)att_protocol_handle_line(s_serial_line, s_serial_send, s_serial_send_ctx);
     }

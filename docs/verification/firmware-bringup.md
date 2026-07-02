@@ -88,6 +88,7 @@ updated: 2026-07-02
 - [x] `ACK:UPLOAD:<seq>` marks the uploaded record as `UP=DONE` in LittleFS.
 - [x] Heartbeat reaches `server/server.py`.
 - [x] OLED initializes on I2C1 and responds to `OLEDTEST` with the sparse 24px test page.
+- [x] USART1 `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands trigger OLED/feedback paths and acknowledge over `COM3`.
 - [ ] OLED displays standby page in normal runtime.
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real card events.
 - [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.

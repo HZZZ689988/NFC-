@@ -27,6 +27,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - Local NFC attendance uses the validated card account SID instead of UID-only records.
 - `LIST:<count>` and `LIST:ALL` now stream stored attendance records as `REC:` lines after `LIST:COUNT`, including upload state as `UP=PENDING/DONE/FAILED`.
 - `SIMATT:<uid>,<sid>,<type>` can inject a simulated attendance record through the app layer while RC522 is paused.
+- `UITEST:<case>` can trigger sparse 24px OLED pages and local LED/buzzer feedback paths while RC522 is paused.
 - The upper-computer serial client now treats `UID:` and `OK:*` replies as transaction terminators, so `READ`, `ISSUE`, image writes and clear commands do not wait for avoidable timeouts.
 - Firmware now links the OLED BSP and an `att_display` module; the display task shows device ID, record count, upload enable state, network state, weather placeholder, standby prompt and attendance OK/duplicate/invalid/error results.
 - ESP01S startup can write NTP time into STM32 RTC; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
@@ -56,6 +57,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - OLED initializes and displays the sparse 24px `OLEDTEST` page.
 - ESP01S connects WiFi, syncs NTP into RTC, connects TCP to `server/server.py` and sends heartbeat.
 - Simulated attendance upload reaches `server/server.py`, receives `ACK:UPLOAD:<seq>` and persists `UP=DONE` in LittleFS.
+- `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands are accepted over `COM3` and route through the same display/feedback callbacks as runtime events.
 
 ## Not Yet Hardware Validated
 
@@ -66,8 +68,8 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - ESP01S real RC522-driven attendance `UPLOAD:` plus `ACK:UPLOAD:<seq>` round trip.
 - Weather query/cache.
 - RTC retention and RTC-derived attendance timestamps on real LSE/VBAT conditions.
-- OLED normal runtime pages, including standby, attendance result, network state and weather pages.
-- LED and TIM3_CH1 buzzer feedback on PE8-PE12/PB4 for attendance and network state events.
+- Physical observation of OLED normal runtime pages, including standby, attendance result, network state and weather pages.
+- Physical observation of LED and TIM3_CH1 buzzer feedback on PE8-PE12/PB4 for attendance and network state events.
 
 ## Main Risks
 

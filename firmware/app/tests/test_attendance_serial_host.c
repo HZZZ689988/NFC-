@@ -14,6 +14,8 @@ typedef struct {
 static att_record_t g_appended_records[4];
 static uint32_t g_appended_record_count;
 static uint32_t g_now_sec = 1234u;
+static attendance_feedback_event_t g_feedback_events[8];
+static uint32_t g_feedback_count;
 
 static void capture_send(const char *line, void *ctx)
 {
@@ -35,13 +37,24 @@ static uint32_t fake_now(void *ctx)
     return g_now_sec;
 }
 
+static void capture_feedback(attendance_feedback_event_t event, void *ctx)
+{
+    (void)ctx;
+    if (g_feedback_count < (sizeof(g_feedback_events) / sizeof(g_feedback_events[0]))) {
+        g_feedback_events[g_feedback_count++] = event;
+    }
+}
+
 static void reset_serial_test_state(void)
 {
     memset(g_appended_records, 0, sizeof(g_appended_records));
     g_appended_record_count = 0u;
+    memset(g_feedback_events, 0, sizeof(g_feedback_events));
+    g_feedback_count = 0u;
     g_now_sec = 1234u;
     require_int(attendance_app_init() == ATT_OK, "attendance_app_init should succeed");
     attendance_app_set_time_source(fake_now, NULL);
+    attendance_app_set_feedback(capture_feedback, NULL);
 }
 
 static void test_dispatches_split_line(void)
@@ -121,6 +134,55 @@ static void test_simatt_rejects_bad_arguments(void)
     require_int(g_appended_record_count == 0u, "bad SIMATT should not append record");
 }
 
+static void test_uitest_dispatches_feedback_cases(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *commands =
+        "UITEST:OK\n"
+        "UITEST:DUP\n"
+        "UITEST:INVALID\n"
+        "UITEST:ERROR\n"
+        "UITEST:NETOK\n"
+        "UITEST:NETERR\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)commands, strlen(commands));
+
+    require_int(strcmp(capture.text,
+                       "OK:UITEST\n"
+                       "OK:UITEST\n"
+                       "OK:UITEST\n"
+                       "OK:UITEST\n"
+                       "OK:UITEST\n"
+                       "OK:UITEST\n") == 0,
+                "UITEST cases should acknowledge success");
+    require_int(g_feedback_count == 6u, "UITEST cases should emit feedback events");
+    require_int(g_feedback_events[0] == ATT_FEEDBACK_ATTEND_OK, "UITEST OK should emit OK feedback");
+    require_int(g_feedback_events[1] == ATT_FEEDBACK_ATTEND_DUPLICATE,
+                "UITEST DUP should emit duplicate feedback");
+    require_int(g_feedback_events[2] == ATT_FEEDBACK_CARD_INVALID,
+                "UITEST INVALID should emit invalid-card feedback");
+    require_int(g_feedback_events[3] == ATT_FEEDBACK_ERROR, "UITEST ERROR should emit error feedback");
+    require_int(g_feedback_events[4] == ATT_FEEDBACK_NETWORK_ONLINE,
+                "UITEST NETOK should emit network-online feedback");
+    require_int(g_feedback_events[5] == ATT_FEEDBACK_NETWORK_FAULT,
+                "UITEST NETERR should emit network-fault feedback");
+}
+
+static void test_uitest_rejects_bad_case(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *command = "UITEST:BAD\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0, "bad UITEST should return arg error");
+    require_int(g_feedback_count == 0u, "bad UITEST should not emit feedback");
+}
+
 int main(void)
 {
     test_dispatches_split_line();
@@ -128,6 +190,8 @@ int main(void)
     test_discards_overlong_line();
     test_simatt_appends_pending_record();
     test_simatt_rejects_bad_arguments();
+    test_uitest_dispatches_feedback_cases();
+    test_uitest_rejects_bad_case();
     return 0;
 }
 

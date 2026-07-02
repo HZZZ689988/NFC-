@@ -159,9 +159,32 @@ static void test_display_draws_oled_gbk_demo_string(void)
     require_int(g_char_count == 0u, "OLED test should not use the direct character path");
 }
 
+static void test_display_draws_event_pages(void)
+{
+    require_int(att_display_init() == ATT_OK, "display init should succeed");
+
+    att_display_show_attendance_duplicate(20u);
+    att_display_poll(20u);
+    require_int(strcmp(line_at(0), "DUP") == 0, "duplicate page should show DUP");
+    require_int(strcmp(line_at(4), "WAIT") == 0, "duplicate page should show WAIT");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
+                "duplicate page should use SimSun 24");
+
+    att_display_show_attendance_invalid(21u);
+    att_display_poll(21u);
+    require_int(strcmp(line_at(0), "BAD CARD") == 0, "invalid page should show BAD CARD");
+    require_int(strcmp(line_at(4), "CHECK") == 0, "invalid page should show CHECK");
+
+    att_display_show_error("TEST", 22u);
+    att_display_poll(22u);
+    require_int(strcmp(line_at(0), "ERROR") == 0, "error page should show ERROR");
+    require_int(strcmp(line_at(4), "TEST") == 0, "error page should show reason");
+}
+
 int main(void)
 {
     test_display_draws_ready_then_releases_event();
     test_display_draws_oled_gbk_demo_string();
+    test_display_draws_event_pages();
     return 0;
 }

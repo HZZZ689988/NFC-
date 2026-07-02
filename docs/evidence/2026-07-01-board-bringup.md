@@ -606,3 +606,38 @@ REC:SEQ=2|UID=A1B2C3D5|SID=1002|NORMAL|1782996812|DEV=1|OK|UP=DONE
 Conclusion: record append, pending upload selection, ESP01S transparent TCP
 send, server ACK, `att_storage_mark_uploaded()` and LittleFS persistence of the
 upload state are board-validated without RC522.
+
+## OLED And Feedback Command Harness
+
+Date: 2026-07-02.
+
+RC522 remained paused. A `UITEST:<case>` serial command was added to trigger the
+same display and feedback paths used by real attendance and network events.
+
+Validated over `COM3` after flashing:
+
+```text
+UITEST:READY   -> OK:UITEST
+UITEST:OK      -> OK:UITEST
+UITEST:DUP     -> OK:UITEST
+UITEST:INVALID -> OK:UITEST
+UITEST:ERROR   -> OK:UITEST
+UITEST:NETOK   -> OK:UITEST
+UITEST:NETERR  -> OK:UITEST
+UITEST:BAD     -> ERR:ARG
+PING           -> OK:PONG
+```
+
+Expected physical behavior:
+
+- `READY`: OLED `TAP CARD` plus current network state.
+- `OK`: OLED `OK` / `ID1001`, L1 pulse and short success tone.
+- `DUP`: OLED `DUP` / `WAIT`, L3 pulse and short duplicate tone.
+- `INVALID`: OLED `BAD CARD` / `CHECK`, L2 pulse and invalid-card tone.
+- `ERROR`: OLED `ERROR` / `TEST`, L4 pulse and fault tone.
+- `NETOK`: ready OLED network line changes to `NET OK`, L5 pulse and network tone.
+- `NETERR`: ready OLED network line changes to `NET ERROR`, L4 pulse and fault tone.
+
+Host tests now cover the `UITEST` command routing and the sparse 24px OLED event
+pages. Physical OLED/LED/buzzer observation still requires watching the board
+during the command sequence.
