@@ -1231,3 +1231,33 @@ Conclusion: the upper-computer serial client, record import parser, SQLite
 storage and CSV export work together against the live board record stream. This
 validates the PC-side attendance import/export path with RC522 substituted by
 previously injected records.
+
+## Image Command Boundary Regression
+
+Date: 2026-07-02.
+
+RC522 real-card I/O remained paused. The firmware image with protocol-level
+image block index checks was built, downloaded and verified:
+
+```text
+make -j4 -> passed, text=105624 data=496 bss=45392
+program build/Demo_W25Q128.elf verify reset exit -> Verified OK
+arm-none-eabi-readelf -l build/Demo_W25Q128.elf -> LOAD segments R E / RW / RW, no RWE
+```
+
+Board command pass over `COM3`:
+
+```text
+PING -> OK:PONG
+IMGN10:00112233445566778899AABBCCDDEEFF -> ERR:ARG
+IMGA23:00112233445566778899AABBCCDDEEFG -> ERR:ARG
+UPDATEIMG -> ERR:NOT_READY
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+TIME? -> TIME:1783015843|VALID=1
+```
+
+Conclusion: the firmware now rejects image-block commands with out-of-range
+indexes or invalid 16-byte hex payloads before calling the card writer, and an
+incomplete image update returns `ERR:NOT_READY`. This validates the non-RC522
+protocol boundary for image-card commands; real Mifare writes still require
+RC522 communication to be restored.

@@ -51,7 +51,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - ARM GCC compile-only checks also passed for the same protocol, serial, NFC and network test sources.
 - `make clean; make` passed in `firmware/stm32/NFCAttend_Base` with LittleFS, RC522, ESP01S, OLED, RTC, LED and MIDI buzzer app modules linked and no warning lines in the build log.
 - `arm-none-eabi-readelf -l build/Demo_W25Q128.elf` shows the Flash `PT_LOAD` segment as `R E` and RAM `PT_LOAD` segments as `RW`, with no `RWE`/`RWX` load segment.
-- STM32 firmware size after this slice: `text=105592`, `data=496`, `bss=45392`.
+- STM32 firmware size after this slice: `text=105624`, `data=496`, `bss=45392`.
 
 ## Board Validated
 
@@ -69,6 +69,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - Simulated attendance upload reaches `server/server.py`, receives `ACK:UPLOAD:<seq>` and persists `UP=DONE` in LittleFS; with the server endpoint unavailable, a simulated record remains `UP=PENDING` and later changes to `UP=DONE` after restoring the endpoint.
 - `SIMATT` now rejects same-UID attendance inside `REPEAT=60` with `ERR:DUPLICATE`; `UPLOAD=0` keeps new simulated records local as `UP=PENDING`, and restoring `UPLOAD=1` retries them to `UP=DONE`.
 - CRC-framed `$PING*6427` returns `OK:PONG`; a bad CRC frame returns `ERR:CRC`; bad `LIST` arguments return `ERR:ARG`; no-card `READ`/`ISSUE`/`CLEAR` return `ERR:NO_CARD`.
+- Image command boundary checks reject `IMGN10` and bad 16-byte hex payloads with `ERR:ARG`; incomplete `UPDATEIMG` returns `ERR:NOT_READY`.
 - `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands are accepted over `COM3` and route through the same display/feedback callbacks as runtime events.
 - Physical observation confirmed the sparse 24px OLED pages, L1-L5 LED mapping and TIM3_CH1 PB4 buzzer feedback for the simulated `UITEST` cases.
 - The upper-computer `SerialClient` read live `LIST:5` records from `COM3`, imported five `REC:` rows with `UP=DONE` into a temporary SQLite database and exported a CSV with the `upload_state` column.
