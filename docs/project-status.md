@@ -60,8 +60,8 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - `WEATHERTEST:Sunny 20C` creates/updates `/weather.txt`; `WEATHER?` reads it back as `WEATHER:Sunny 20C` after DAP reset.
 - ESP01S connects WiFi, syncs NTP into RTC, connects TCP to `server/server.py` and sends heartbeat.
 - After a DAP reset, a pre-NTP simulated attendance record used RTC-derived Unix seconds instead of RTOS uptime fallback.
-- `TIME?` reports the app time source over `COM3`; after a reported board power cycle, current board result was `TIME:1783011807|VALID=1`.
-- Weather location is configured for Hangzhou as `WLOC=30.2741:120.1551`; forced real weather query still returns `ERR:NOT_READY` until a private Seniverse `WKEY` is configured.
+- `TIME?` reports the app time source over `COM3`; after a reported board power cycle, current board result was `TIME:1783011952|VALID=1`.
+- Weather location is configured for Hangzhou as `WLOC=30.267:120.153`; forced real weather query still returns `ERR:NOT_READY` until a private Seniverse `WKEY` is configured.
 - Simulated attendance upload reaches `server/server.py`, receives `ACK:UPLOAD:<seq>` and persists `UP=DONE` in LittleFS.
 - `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands are accepted over `COM3` and route through the same display/feedback callbacks as runtime events.
 - Physical observation confirmed the sparse 24px OLED pages, L1-L5 LED mapping and TIM3_CH1 PB4 buzzer feedback for the simulated `UITEST` cases.

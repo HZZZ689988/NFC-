@@ -853,18 +853,19 @@ Host: api.seniverse.com
 
 The official Seniverse daily weather documentation shows the same query
 parameter shape with `key`, `location`, `language`, `unit`, `start` and `days`.
-Hangzhou was configured as a compact latitude/longitude location:
+The Seniverse common API parameters define coordinate locations as
+`latitude:longitude`. Hangzhou was configured as a compact coordinate location:
 
 ```text
-CFG:WKEY=|WLOC=30.2741:120.1551 -> OK:CFG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.2741:120.1551
+CFG:WKEY=|WLOC=30.267:120.153 -> OK:CFG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
 WEATHER! -> ERR:NOT_READY
-TIME? -> TIME:1783011807|VALID=1
+TIME? -> TIME:1783011952|VALID=1
 ```
 
 Conclusion: after the reported power cycle, the application time source still
 returned a valid Unix timestamp over `TIME?`, and the board now persists the
-Hangzhou weather location as `30.2741:120.1551`. `WEATHER!` correctly returned
+Hangzhou weather location as `30.267:120.153`. `WEATHER!` correctly returned
 `ERR:NOT_READY` because `WKEY` is intentionally empty. A real weather query
 still requires a private Seniverse API key from the user's own account; no
 public key can be safely or legitimately substituted.
