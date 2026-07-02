@@ -61,6 +61,25 @@ static uint8_t parse_u32(const char *text, uint32_t *value)
     return 1u;
 }
 
+static void compact_weather_day(const char *src, char *dest, size_t dest_len)
+{
+    if (dest == NULL || dest_len == 0u) {
+        return;
+    }
+
+    dest[0] = '\0';
+    if (src == NULL || *src == '\0') {
+        return;
+    }
+
+    size_t i = 0u;
+    while (i < dest_len - 1u && src[i] != '\0' && src[i] != ' ') {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';
+}
+
 static void handle_rx_line(const char *line)
 {
     static const char upload_ack_prefix[] = "ACK:UPLOAD:";
@@ -148,7 +167,9 @@ att_status_t att_network_query_weather(char *text, size_t text_len)
         return ATT_ERR;
     }
 
-    snprintf(text, text_len, "%s %s/%sC", city[0] ? city : s_config.weather_location, day, low);
+    char short_day[8];
+    compact_weather_day(day, short_day, sizeof(short_day));
+    snprintf(text, text_len, "%s %sC", short_day[0] ? short_day : "Weather", low);
     return ATT_OK;
 }
 

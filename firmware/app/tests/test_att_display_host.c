@@ -181,10 +181,26 @@ static void test_display_draws_event_pages(void)
     require_int(strcmp(line_at(4), "TEST") == 0, "error page should show reason");
 }
 
+static void test_display_draws_weather_page(void)
+{
+    require_int(att_display_init() == ATT_OK, "display init should succeed");
+
+    att_display_set_weather("Sunny 20C");
+    att_display_show_weather(30u);
+    att_display_poll(30u);
+
+    require_int(g_line_count == 2u, "weather page should use two 24px lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
+                "weather page should use SimSun 24");
+    require_int(strcmp(line_at(0), "WEATHER") == 0, "weather page should show title");
+    require_int(strcmp(line_at(4), "Sunny 20C") == 0, "weather page should show cached text");
+}
+
 int main(void)
 {
     test_display_draws_ready_then_releases_event();
     test_display_draws_oled_gbk_demo_string();
     test_display_draws_event_pages();
+    test_display_draws_weather_page();
     return 0;
 }

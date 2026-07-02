@@ -45,6 +45,7 @@ updated: 2026-07-02
 - [x] `make clean; make` links OLED BSP sources: `ssd1306.c`, `ssd1306_i2c.c`, `GUISlim.c` and `F08_ASCII.c`.
 - [x] `att_storage.c`, `att_network.c`, network/weather polling tests and full STM32 firmware compile with weather cache and RTC integration.
 - [x] Host tests verify `UPLOAD=0` skips heartbeat/upload while preserving NTP and weather polling.
+- [x] Host tests cover `WEATHER?`, `WEATHERTEST:<text>`, compact weather text and the sparse 24px OLED weather page.
 - [x] Feedback callback paths and full STM32 firmware compile with LED/MIDI buzzer integration.
 - [x] Protocol and Python tests cover `CFG:` config command construction, persistence and runtime apply callback paths.
 - [x] Resolve linker warning: `build/Demo_W25Q128.elf has a LOAD segment with RWX permissions`.
@@ -92,8 +93,9 @@ updated: 2026-07-02
 - [x] USART1 `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands trigger OLED/feedback paths and acknowledge over `COM3`.
 - [x] OLED displays standby and simulated attendance/network pages through `UITEST`, confirmed by physical observation.
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real RC522 card events.
-- [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.
-- [ ] LittleFS `/weather.txt` is created/updated after successful weather query and reloaded on reboot.
+- [x] OLED displays ESP01S network state and cached weather text through the sparse 24px weather page.
+- [x] LittleFS `/weather.txt` is created/updated through `WEATHERTEST:<text>` and reloaded after DAP reset.
+- [ ] ESP01S real weather API query with configured `WKEY` updates `/weather.txt`.
 - [x] L1 indicates simulated attendance OK through `UITEST`, confirmed by physical observation.
 - [x] L2 indicates simulated invalid-card rejection through `UITEST`, confirmed by physical observation.
 - [x] L3 indicates simulated duplicate attendance skip through `UITEST`, confirmed by physical observation.

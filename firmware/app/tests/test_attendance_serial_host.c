@@ -16,6 +16,7 @@ static uint32_t g_appended_record_count;
 static uint32_t g_now_sec = 1234u;
 static attendance_feedback_event_t g_feedback_events[8];
 static uint32_t g_feedback_count;
+static char g_weather_text[32];
 
 static void capture_send(const char *line, void *ctx)
 {
@@ -52,6 +53,7 @@ static void reset_serial_test_state(void)
     memset(g_feedback_events, 0, sizeof(g_feedback_events));
     g_feedback_count = 0u;
     g_now_sec = 1234u;
+    g_weather_text[0] = '\0';
     require_int(attendance_app_init() == ATT_OK, "attendance_app_init should succeed");
     attendance_app_set_time_source(fake_now, NULL);
     attendance_app_set_feedback(capture_feedback, NULL);
@@ -183,6 +185,40 @@ static void test_uitest_rejects_bad_case(void)
     require_int(g_feedback_count == 0u, "bad UITEST should not emit feedback");
 }
 
+static void test_weather_test_saves_and_reads_cache(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *commands =
+        "WEATHERTEST:Sunny 20C\n"
+        "WEATHER?\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)commands, strlen(commands));
+
+    require_int(strcmp(capture.text,
+                       "OK:WEATHERTEST\n"
+                       "WEATHER:Sunny 20C\n") == 0,
+                "weather test command should save and read cached weather");
+    require_int(strcmp(g_weather_text, "Sunny 20C") == 0,
+                "weather test command should update storage cache");
+}
+
+static void test_weather_test_rejects_bad_text(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *command = "WEATHERTEST:\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0,
+                "empty weather test text should be rejected");
+    require_int(g_weather_text[0] == '\0',
+                "bad weather test should not update storage cache");
+}
+
 int main(void)
 {
     test_dispatches_split_line();
@@ -192,6 +228,8 @@ int main(void)
     test_simatt_rejects_bad_arguments();
     test_uitest_dispatches_feedback_cases();
     test_uitest_rejects_bad_case();
+    test_weather_test_saves_and_reads_cache();
+    test_weather_test_rejects_bad_text();
     return 0;
 }
 
@@ -326,11 +364,19 @@ att_status_t att_storage_load_weather(char *text, size_t text_len)
     if (text == NULL || text_len == 0u) {
         return ATT_ERR_INVALID_ARG;
     }
+    if (g_weather_text[0] != '\0') {
+        snprintf(text, text_len, "%s", g_weather_text);
+        return ATT_OK;
+    }
     text[0] = '\0';
     return ATT_ERR_STORAGE;
 }
 
 att_status_t att_storage_save_weather(const char *text)
 {
-    return text == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+    if (text == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    snprintf(g_weather_text, sizeof(g_weather_text), "%s", text);
+    return ATT_OK;
 }

@@ -12,6 +12,7 @@ static void *g_data_cb_ctx;
 static char g_last_sent[256];
 static uint32_t g_last_mark_uploaded_seq;
 static unsigned g_mark_uploaded_calls;
+static unsigned g_weather_calls;
 
 static void require_int(int condition, const char *message)
 {
@@ -30,6 +31,7 @@ static void reset_mocks(void)
     g_data_cb_ctx = NULL;
     g_last_mark_uploaded_seq = 0u;
     g_mark_uploaded_calls = 0u;
+    g_weather_calls = 0u;
 }
 
 static att_device_config_t base_config(void)
@@ -120,6 +122,23 @@ static void test_upload_ack_handles_split_lines(void)
     require_int(g_last_mark_uploaded_seq == 77u, "split upload ACK should mark the ACK sequence");
 }
 
+static void test_weather_query_returns_compact_oled_text(void)
+{
+    reset_mocks();
+    att_device_config_t config = base_config();
+    snprintf(config.weather_key, sizeof(config.weather_key), "%s", "test-key");
+    snprintf(config.weather_location, sizeof(config.weather_location), "%s", "hangzhou");
+    require_int(att_network_init(&config) == ATT_OK, "network init should succeed before weather query");
+
+    char text[32];
+    att_status_t status = att_network_query_weather(text, sizeof(text));
+
+    require_int(status == ATT_OK, "weather query should return ATT_OK");
+    require_int(g_weather_calls == 1u, "weather query should call ESP driver");
+    require_int(strcmp(text, "Sunny 20C") == 0,
+                "weather query should return compact OLED text");
+}
+
 int main(void)
 {
     test_network_init_rejects_host_that_does_not_fit_esp_config();
@@ -127,6 +146,7 @@ int main(void)
     test_upload_ack_marks_matching_record_uploaded();
     test_upload_ack_ignores_invalid_sequence();
     test_upload_ack_handles_split_lines();
+    test_weather_query_returns_compact_oled_text();
     return 0;
 }
 
@@ -175,16 +195,22 @@ int ESP01S_QueryWeather(const char *apiKey, const char *location,
     (void)unit;
     (void)outCity;
     (void)cityBufSize;
-    (void)outTextDay;
-    (void)textDayBufSize;
-    (void)outHigh;
-    (void)highBufSize;
-    (void)outTextNight;
-    (void)textNightBufSize;
-    (void)outLow;
-    (void)lowBufSize;
-    (void)outPrecip;
-    (void)precipBufSize;
+    g_weather_calls++;
+    if (outTextDay != NULL && textDayBufSize > 0u) {
+        snprintf(outTextDay, textDayBufSize, "%s", "Sunny");
+    }
+    if (outHigh != NULL && highBufSize > 0u) {
+        snprintf(outHigh, highBufSize, "%s", "28");
+    }
+    if (outTextNight != NULL && textNightBufSize > 0u) {
+        snprintf(outTextNight, textNightBufSize, "%s", "Clear");
+    }
+    if (outLow != NULL && lowBufSize > 0u) {
+        snprintf(outLow, lowBufSize, "%s", "20");
+    }
+    if (outPrecip != NULL && precipBufSize > 0u) {
+        snprintf(outPrecip, precipBufSize, "%s", "0");
+    }
     return 0;
 }
 

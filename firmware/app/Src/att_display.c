@@ -22,6 +22,7 @@ typedef enum {
     ATT_DISPLAY_EVENT_DUPLICATE,
     ATT_DISPLAY_EVENT_INVALID,
     ATT_DISPLAY_EVENT_ERROR,
+    ATT_DISPLAY_EVENT_WEATHER,
     ATT_DISPLAY_EVENT_OLED_TEST,
 } att_display_event_t;
 
@@ -147,6 +148,10 @@ static void draw_status_screen(uint32_t now_sec)
         draw_big_line(0u, "ERROR");
         draw_big_line(1u, s_display.message[0] ? s_display.message : "UNKNOWN");
         break;
+    case ATT_DISPLAY_EVENT_WEATHER:
+        draw_big_line(0u, "WEATHER");
+        draw_big_line(1u, s_display.weather[0] ? s_display.weather : "WEATHER --");
+        break;
     case ATT_DISPLAY_EVENT_READY:
     default:
         draw_big_line(0u, "TAP CARD");
@@ -246,6 +251,11 @@ void att_display_show_error(const char *reason, uint32_t now_sec)
 {
     copy_text(s_display.message, sizeof(s_display.message), reason);
     set_event(ATT_DISPLAY_EVENT_ERROR, now_sec);
+}
+
+void att_display_show_weather(uint32_t now_sec)
+{
+    set_event(ATT_DISPLAY_EVENT_WEATHER, now_sec);
 }
 
 void att_display_show_oled_test(void)

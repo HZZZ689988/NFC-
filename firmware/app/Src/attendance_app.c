@@ -116,6 +116,41 @@ static uint8_t parse_uid_hex(const char *text, att_uid_t *uid)
     return 1u;
 }
 
+static uint8_t weather_text_is_valid(const char *text)
+{
+    if (text == NULL || *text == '\0') {
+        return 0u;
+    }
+
+    for (const char *p = text; *p != '\0'; ++p) {
+        unsigned char ch = (unsigned char)*p;
+        if (ch < 0x20u || ch == '|') {
+            return 0u;
+        }
+    }
+
+    return 1u;
+}
+
+static void copy_weather_text(char *dest, size_t dest_len, const char *src)
+{
+    if (dest == NULL || dest_len == 0u) {
+        return;
+    }
+
+    if (src == NULL) {
+        dest[0] = '\0';
+        return;
+    }
+
+    size_t i = 0u;
+    while (i < dest_len - 1u && src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';
+}
+
 static uint8_t parse_u32_until(const char *text, char terminator, uint32_t max_value,
                                uint32_t *value, const char **end)
 {
@@ -270,6 +305,71 @@ static att_status_t handle_ui_test(const char *payload)
     return ATT_ERR_INVALID_ARG;
 }
 
+static att_status_t load_weather_text(char *weather, size_t weather_len)
+{
+    att_status_t status = att_storage_load_weather(weather, weather_len);
+    if (status == ATT_ERR_STORAGE || (status == ATT_OK && weather[0] == '\0')) {
+        copy_weather_text(weather, weather_len, "WEATHER --");
+        return ATT_OK;
+    }
+    return status;
+}
+
+static att_status_t save_weather_text(const char *weather)
+{
+    if (weather_text_is_valid(weather) == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    char stored[ATT_WEATHER_TEXT_LEN];
+    copy_weather_text(stored, sizeof(stored), weather);
+    att_status_t status = att_storage_save_weather(stored);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    att_display_set_weather(stored);
+    att_display_show_weather(app_now());
+    return ATT_OK;
+}
+
+static att_status_t query_weather_now(char *weather, size_t weather_len)
+{
+#if ATT_ENABLE_NETWORK
+    if (s_network_ready == 0u) {
+        return ATT_ERR_NOT_READY;
+    }
+
+    att_status_t status = att_network_query_weather(weather, weather_len);
+    if (status != ATT_OK || weather[0] == '\0') {
+        return status == ATT_OK ? ATT_ERR : status;
+    }
+
+    status = att_storage_save_weather(weather);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    att_display_set_weather(weather);
+    att_display_show_weather(app_now());
+    s_last_weather_time = app_now();
+    s_weather_due = 0u;
+    set_network_state(ATT_DISPLAY_NET_ONLINE);
+    return ATT_OK;
+#else
+    (void)weather;
+    (void)weather_len;
+    return ATT_ERR_NOT_READY;
+#endif
+}
+
+static void send_weather_response(const char *weather)
+{
+    char response[64];
+    snprintf(response, sizeof(response), "WEATHER:%s\n", weather != NULL ? weather : "");
+    s_serial_send(response, s_serial_send_ctx);
+}
+
 static att_status_t apply_runtime_config(const att_device_config_t *config, void *ctx)
 {
     (void)ctx;
@@ -315,6 +415,33 @@ static void dispatch_serial_line(void)
     } else if (parsed == ATT_OK && strncmp(payload, "UITEST:", 7) == 0) {
         att_status_t status = handle_ui_test(payload);
         s_serial_send(status == ATT_OK ? "OK:UITEST\n" : "ERR:ARG\n", s_serial_send_ctx);
+    } else if (parsed == ATT_OK && strcmp(payload, "WEATHER?") == 0) {
+        char weather[ATT_WEATHER_TEXT_LEN];
+        att_status_t status = load_weather_text(weather, sizeof(weather));
+        if (status == ATT_OK) {
+            att_display_set_weather(weather);
+            att_display_show_weather(app_now());
+            send_weather_response(weather);
+        } else {
+            s_serial_send("ERR:WEATHER\n", s_serial_send_ctx);
+        }
+    } else if (parsed == ATT_OK && strncmp(payload, "WEATHERTEST:", 12) == 0) {
+        att_status_t status = save_weather_text(payload + 12u);
+        s_serial_send(status == ATT_OK ? "OK:WEATHERTEST\n" :
+                      status == ATT_ERR_STORAGE ? "ERR:WEATHER\n" : "ERR:ARG\n",
+                      s_serial_send_ctx);
+    } else if (parsed == ATT_OK && strcmp(payload, "WEATHER!") == 0) {
+        char weather[ATT_WEATHER_TEXT_LEN];
+        att_status_t status = query_weather_now(weather, sizeof(weather));
+        if (status == ATT_OK) {
+            send_weather_response(weather);
+        } else if (status == ATT_ERR_NOT_READY) {
+            s_serial_send("ERR:NOT_READY\n", s_serial_send_ctx);
+        } else if (status == ATT_ERR_STORAGE) {
+            s_serial_send("ERR:WEATHER\n", s_serial_send_ctx);
+        } else {
+            s_serial_send("ERR:WEATHER\n", s_serial_send_ctx);
+        }
     } else {
         (void)att_protocol_handle_line(s_serial_line, s_serial_send, s_serial_send_ctx);
     }

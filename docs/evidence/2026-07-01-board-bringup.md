@@ -739,3 +739,60 @@ seconds immediately, before the next NTP sync finished. Simulated attendance
 records were appended, read back through the CRC-checked LittleFS record path,
 uploaded, ACKed and marked `UP=DONE`. This verifies DAP-reset RTC continuity; it
 does not replace a full power-loss/VBAT retention test.
+
+## Weather Cache And OLED Page Harness
+
+Date: 2026-07-02.
+
+RC522 remained paused. A short weather diagnostic was added so the LittleFS
+weather cache and sparse 24px OLED weather page can be validated without a real
+weather API key.
+
+Host verification:
+
+```text
+python firmware/app/tests/run_host_tests.py -> passed
+python pc_tool/tests/test_core.py -> passed
+make -j4 -> passed, text=105096 data=496 bss=44360
+```
+
+Flash verification:
+
+```text
+program build/Demo_W25Q128.elf verify reset exit -> Verified OK
+```
+
+Board command pass:
+
+```text
+PING -> OK:PONG
+WEATHERTEST:Sunny 20C -> OK:WEATHERTEST
+WEATHER? -> WEATHER:Sunny 20C
+```
+
+`WEATHERTEST` writes `/weather.txt`, updates the display model and switches OLED
+to the two-line 24px page:
+
+```text
+WEATHER
+Sunny 20C
+```
+
+After a DAP reset, the cached weather was still available and the device config
+remained intact:
+
+```text
+WEATHER? -> WEATHER:Sunny 20C
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+```
+
+The forced real query command was also exercised without a weather API key:
+
+```text
+WEATHER! -> ERR:NOT_READY
+```
+
+Conclusion: LittleFS `/weather.txt` creation/update, serial readback, startup
+reload and the compact 24px OLED weather page are board-validated. The real
+ESP01S weather API path still needs a valid `WKEY` before it can be marked as
+hardware-validated.

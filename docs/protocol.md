@@ -36,6 +36,9 @@ LIST:<count>
 LIST:ALL
 SIMATT:A1B2C3D4,1001,2
 UITEST:OK
+WEATHER?
+WEATHERTEST:Sunny 20C
+WEATHER!
 CFG?
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
 CFG:SSID=wifi-name
@@ -57,6 +60,8 @@ OK:UPDATEIMG
 OK:CLEAR
 OK:SIMATT:SEQ=13
 OK:UITEST
+WEATHER:Sunny 20C
+OK:WEATHERTEST
 ERR:NO_CARD
 ERR:UID_MISMATCH
 ERR:CRC
@@ -90,6 +95,13 @@ record type is `0` for `IN`, `1` for `OUT` and `2` for `NORMAL`.
 `UITEST:<case>` is a board-verification command for OLED and local feedback
 while RC522 is paused. Supported cases are `READY`, `OK`, `DUP`, `INVALID`,
 `ERROR`, `NETOK` and `NETERR`.
+
+`WEATHER?` reads the cached LittleFS `/weather.txt` value and returns
+`WEATHER:<text>`. Empty or missing cache is reported as `WEATHER:WEATHER --`.
+`WEATHERTEST:<text>` stores a short test weather string, updates the OLED weather
+page and returns `OK:WEATHERTEST`. `WEATHER!` forces one ESP01S weather query
+when WiFi/network is ready and weather config is present; it returns
+`WEATHER:<text>` on success or `ERR:NOT_READY` / `ERR:WEATHER` on failure.
 
 ## Device Config
 

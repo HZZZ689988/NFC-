@@ -28,6 +28,7 @@ void att_display_show_attendance_ok(uint32_t seq, uint32_t sid, uint32_t now_sec
 void att_display_show_attendance_duplicate(uint32_t now_sec);
 void att_display_show_attendance_invalid(uint32_t now_sec);
 void att_display_show_error(const char *reason, uint32_t now_sec);
+void att_display_show_weather(uint32_t now_sec);
 void att_display_show_oled_test(void);
 void att_display_poll(uint32_t now_sec);
 

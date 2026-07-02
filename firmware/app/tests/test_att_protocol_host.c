@@ -430,6 +430,11 @@ void att_display_show_oled_test(void)
     g_oled_test_calls++;
 }
 
+void att_display_show_weather(uint32_t now_sec)
+{
+    (void)now_sec;
+}
+
 att_status_t att_storage_init(void)
 {
     return ATT_OK;
