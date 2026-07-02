@@ -14,6 +14,7 @@
 #define ATT_CARD_TEXT_TOTAL_BLOCKS   (ATT_CARD_TEXT_BLOCKS * 2u)
 #define ATT_CARD_PORTRAIT_DONE_MASK  ((1UL << ATT_CARD_PORTRAIT_BLOCKS) - 1UL)
 #define ATT_CARD_TEXT_DONE_MASK      ((uint16_t)((1u << ATT_CARD_TEXT_BLOCKS) - 1u))
+#define ATT_CARD_SPI_RW_TEST_VALUE   0x7Au
 
 static att_uid_t s_image_uid;
 static uint8_t s_image_session_active;
@@ -163,6 +164,13 @@ att_status_t att_card_diag(att_card_diag_t *diag)
     diag->error = RC522_ReadRegister(RC522_REG_ERROR);
     diag->pins = RC522_Platform_ReadPins();
     diag->shared_mosi_flash_cs = RC522_Platform_MosiSharesFlashCs();
+    diag->serial_speed_before = RC522_ReadRegister(RC522_REG_SERIALSPEED);
+    RC522_WriteRegister(RC522_REG_SERIALSPEED, ATT_CARD_SPI_RW_TEST_VALUE);
+    diag->serial_speed_test = RC522_ReadRegister(RC522_REG_SERIALSPEED);
+    RC522_WriteRegister(RC522_REG_SERIALSPEED, diag->serial_speed_before);
+    diag->serial_speed_after = RC522_ReadRegister(RC522_REG_SERIALSPEED);
+    diag->spi_rw_ok = (uint8_t)((diag->serial_speed_test == ATT_CARD_SPI_RW_TEST_VALUE) &&
+                                (diag->serial_speed_after == diag->serial_speed_before));
     RC522_ConfigISOType('A');
     diag->version = RC522_ReadRegister(RC522_REG_VERSION);
     diag->command = RC522_ReadRegister(RC522_REG_COMMAND);

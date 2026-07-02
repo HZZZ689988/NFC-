@@ -438,9 +438,9 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
             return status;
         }
 
-        char response[160];
+        char response[192];
         snprintf(response, sizeof(response),
-                 "DIAG:RC522_RAW=0x%02X|RC522_VER=0x%02X|CMD=0x%02X|IRQ=0x%02X|FIFO=0x%02X|TX=0x%02X|ERR=0x%02X|PINS=0x%02X|SHARE=%u|REQ=%d|TAG=%02X%02X\n",
+                 "DIAG:RC522_RAW=0x%02X|RC522_VER=0x%02X|CMD=0x%02X|IRQ=0x%02X|FIFO=0x%02X|TX=0x%02X|ERR=0x%02X|PINS=0x%02X|SHARE=%u|SPD=0x%02X->0x%02X->0x%02X|RW=%u|REQ=%d|TAG=%02X%02X\n",
                  diag.version_raw,
                  diag.version,
                  diag.command,
@@ -450,6 +450,10 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
                  diag.error,
                  diag.pins,
                  (unsigned int)diag.shared_mosi_flash_cs,
+                 diag.serial_speed_before,
+                 diag.serial_speed_test,
+                 diag.serial_speed_after,
+                 (unsigned int)diag.spi_rw_ok,
                  (int)diag.request_status,
                  diag.tag_type[0],
                  diag.tag_type[1]);

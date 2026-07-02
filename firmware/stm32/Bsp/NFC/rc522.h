@@ -221,6 +221,7 @@ void RC522_AntennaOn(void);
  */
 void RC522_AntennaOff(void);
 uint8_t RC522_ReadRegister(uint8_t reg);
+void RC522_WriteRegister(uint8_t reg, uint8_t value);
 
 // ---------- 卡片基本操作 ----------
 

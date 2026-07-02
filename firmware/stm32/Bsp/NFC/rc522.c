@@ -353,6 +353,11 @@ uint8_t RC522_ReadRegister(uint8_t reg)
     return rc522_read_reg(reg);
 }
 
+void RC522_WriteRegister(uint8_t reg, uint8_t value)
+{
+    rc522_write_reg(reg, value);
+}
+
 /* ---------- 卡片基本操作 ---------- */
 
 char RC522_Request(uint8_t req_code, uint8_t *pTagType)

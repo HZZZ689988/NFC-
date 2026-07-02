@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 
+#define RC522_ONLY_SPI_RW_TEST_VALUE 0x7Au
+
 static UartDrv_t s_diag_uart;
 
 static void rc522_only_print_diag(void)
@@ -22,6 +24,13 @@ static void rc522_only_print_diag(void)
     uint8_t raw_tx = RC522_ReadRegister(RC522_REG_TXCONTROL);
     uint8_t raw_error = RC522_ReadRegister(RC522_REG_ERROR);
     uint8_t raw_pins = RC522_Platform_ReadPins();
+    uint8_t speed_before = RC522_ReadRegister(RC522_REG_SERIALSPEED);
+    RC522_WriteRegister(RC522_REG_SERIALSPEED, RC522_ONLY_SPI_RW_TEST_VALUE);
+    uint8_t speed_test = RC522_ReadRegister(RC522_REG_SERIALSPEED);
+    RC522_WriteRegister(RC522_REG_SERIALSPEED, speed_before);
+    uint8_t speed_after = RC522_ReadRegister(RC522_REG_SERIALSPEED);
+    uint8_t spi_rw_ok = (uint8_t)((speed_test == RC522_ONLY_SPI_RW_TEST_VALUE) &&
+                                  (speed_after == speed_before));
 
     RC522_ConfigISOType('A');
 
@@ -36,7 +45,7 @@ static void rc522_only_print_diag(void)
     int scan_status = (int)RC522_ScanCard(uid);
     uint8_t share = RC522_Platform_MosiSharesFlashCs();
 
-    printf("RC522_ONLY:RAW=0x%02X|VER=0x%02X|CMD=0x%02X->0x%02X|IRQ=0x%02X->0x%02X|FIFO=0x%02X->0x%02X|TX=0x%02X->0x%02X|ERR=0x%02X->0x%02X|PINS=0x%02X->0x%02X|SHARE=%u|REQ=%d|TAG=%02X%02X|SCAN=%d|UID=%02X%02X%02X%02X\r\n",
+    printf("RC522_ONLY:RAW=0x%02X|VER=0x%02X|CMD=0x%02X->0x%02X|IRQ=0x%02X->0x%02X|FIFO=0x%02X->0x%02X|TX=0x%02X->0x%02X|ERR=0x%02X->0x%02X|PINS=0x%02X->0x%02X|SHARE=%u|SPD=0x%02X->0x%02X->0x%02X|RW=%u|REQ=%d|TAG=%02X%02X|SCAN=%d|UID=%02X%02X%02X%02X\r\n",
            raw_version,
            version,
            raw_command,
@@ -52,6 +61,10 @@ static void rc522_only_print_diag(void)
            raw_pins,
            pins,
            (unsigned int)share,
+           speed_before,
+           speed_test,
+           speed_after,
+           (unsigned int)spi_rw_ok,
            request_status,
            tag_type[0],
            tag_type[1],

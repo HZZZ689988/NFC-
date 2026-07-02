@@ -29,6 +29,10 @@ typedef struct {
     uint8_t error;
     uint8_t pins;
     uint8_t shared_mosi_flash_cs;
+    uint8_t serial_speed_before;
+    uint8_t serial_speed_test;
+    uint8_t serial_speed_after;
+    uint8_t spi_rw_ok;
     int8_t request_status;
     uint8_t tag_type[2];
 } att_card_diag_t;
