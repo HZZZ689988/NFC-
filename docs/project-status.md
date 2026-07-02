@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, upper-computer serial-client interop, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, anti-repeat substitute validation, upload-enable gating, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback. Upper-computer SQLite and CSV persistence are host-validated for people, issue logs, lost-card marks, attendance import, upload-state refresh and UTF-8-SIG export.
+The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, upper-computer serial-client interop, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, anti-repeat substitute validation, upload-enable gating, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, physical OLED/LED/buzzer feedback, and upper-computer import/export against live board records. Upper-computer SQLite and CSV persistence are host-validated for people, issue logs, lost-card marks, attendance import, upload-state refresh and UTF-8-SIG export.
 
 ## Implemented
 
@@ -71,6 +71,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - CRC-framed `$PING*6427` returns `OK:PONG`; a bad CRC frame returns `ERR:CRC`; bad `LIST` arguments return `ERR:ARG`; no-card `READ`/`ISSUE`/`CLEAR` return `ERR:NO_CARD`.
 - `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands are accepted over `COM3` and route through the same display/feedback callbacks as runtime events.
 - Physical observation confirmed the sparse 24px OLED pages, L1-L5 LED mapping and TIM3_CH1 PB4 buzzer feedback for the simulated `UITEST` cases.
+- The upper-computer `SerialClient` read live `LIST:5` records from `COM3`, imported five `REC:` rows with `UP=DONE` into a temporary SQLite database and exported a CSV with the `upload_state` column.
 
 ## Not Yet Hardware Validated
 

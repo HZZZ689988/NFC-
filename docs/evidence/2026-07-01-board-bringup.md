@@ -1190,3 +1190,44 @@ Conclusion: the upper-computer now preserves the upload status returned by the
 board, displays it in the attendance-record table and exports it with the rest
 of the attendance data. This validates the SQLite/CSV side of the
 upper-computer requirements while RC522 card operations remain paused.
+
+## Upper-Computer Live Import And CSV Export
+
+Date: 2026-07-02.
+
+RC522 remained paused. The desktop upper-computer modules were used against the
+live board on `COM3` to read existing substitute attendance records, import them
+into a temporary SQLite database and export a CSV.
+
+Commands and board responses:
+
+```text
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+TIME? -> TIME:1783015349|VALID=1
+LIST:5 ->
+LIST:COUNT=11
+REC:SEQ=7|UID=A1B2C3EA|SID=2101|NORMAL|1783013204|DEV=1|OK|UP=DONE
+REC:SEQ=8|UID=A1B2C3EB|SID=2102|NORMAL|1783014458|DEV=1|OK|UP=DONE
+REC:SEQ=9|UID=A1B2C3EB|SID=2102|NORMAL|1783014458|DEV=1|OK|UP=DONE
+REC:SEQ=10|UID=A1B2C3EC|SID=2201|NORMAL|1783014647|DEV=1|OK|UP=DONE
+REC:SEQ=11|UID=A1B2C3ED|SID=2202|NORMAL|1783014648|DEV=1|OK|UP=DONE
+LIST:END
+```
+
+Temporary database and CSV result:
+
+```text
+IMPORT: rec_count=5 rows=5
+DBROW: 11 A1B2C3ED 2202 NORMAL 1 OK DONE
+DBROW: 10 A1B2C3EC 2201 NORMAL 1 OK DONE
+DBROW: 9 A1B2C3EB 2102 NORMAL 1 OK DONE
+DBROW: 8 A1B2C3EB 2102 NORMAL 1 OK DONE
+DBROW: 7 A1B2C3EA 2101 NORMAL 1 OK DONE
+CSV_HEADER: seq|uid_hex|sid|record_type|occurred_at|device_id|status|upload_state|imported_at
+CSV_FIRST: 11|A1B2C3ED|2202|NORMAL|1783014648|1|OK|DONE
+```
+
+Conclusion: the upper-computer serial client, record import parser, SQLite
+storage and CSV export work together against the live board record stream. This
+validates the PC-side attendance import/export path with RC522 substituted by
+previously injected records.
