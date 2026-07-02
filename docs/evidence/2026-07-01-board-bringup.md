@@ -869,3 +869,59 @@ Hangzhou weather location as `30.267:120.153`. `WEATHER!` correctly returned
 `ERR:NOT_READY` because `WKEY` is intentionally empty. A real weather query
 still requires a private Seniverse API key from the user's own account; no
 public key can be safely or legitimately substituted.
+
+## Real Seniverse Weather Query
+
+Date: 2026-07-02.
+
+The user provided a private Seniverse API key. The key was used only for local
+validation and is not recorded in full in this repository.
+
+PC-side API probe:
+
+```text
+GET /v3/weather/daily.json?key=<redacted>&location=30.267:120.153&language=en&unit=c&start=0&days=1
+Location=Hangzhou
+TextDay=Light rain
+High=29
+Low=23
+Date=2026-07-02
+LastUpdate=2026-07-02T08:00:00+08:00
+```
+
+The first board run confirmed the key and location were not the problem but
+exposed an ESP01S mode-transition issue:
+
+```text
+WEATHER! -> ERR:WEATHER
+[ESP01S] weather CIPSEND not ready
+WEATHER? -> WEATHER:Sunny 20C
+```
+
+The ESP01S weather path was then fixed to leave transparent TCP mode more
+conservatively, switch back to `CIPMODE=0` before fixed-length HTTP send, wait
+for the `AT+CIPSEND=<len>` `>` prompt before sending the HTTP GET, and increase
+the weather HTTP receive buffer to 2048 bytes.
+
+Verification:
+
+```text
+python firmware/app/tests/run_host_tests.py -> passed
+python pc_tool/tests/test_core.py -> passed
+make -j4 -> passed, text=105496 data=496 bss=45392
+program build/Demo_W25Q128.elf verify reset exit -> Verified OK
+```
+
+Board command pass:
+
+```text
+[ESP01S] weather query success: Hangzhou day Light rain 29C night Light rain 23C precip 0.80
+WEATHER! -> WEATHER:Light 23C
+WEATHER? -> WEATHER:Light 23C
+TIME? -> TIME:1783012906|VALID=1
+```
+
+Conclusion: the real ESP01S-to-Seniverse weather path is board-validated with
+Hangzhou coordinates and the private API key. The result is cached in
+LittleFS `/weather.txt`, read back by `WEATHER?`, and displayed through the
+existing sparse 24px weather page.

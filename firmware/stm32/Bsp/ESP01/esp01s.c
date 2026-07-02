@@ -67,8 +67,11 @@ typedef struct {
     uint8_t               ntpUdpPending;   /**< UDP NTP等待标志(1=正在等待NTP响应) */
     uint32_t              ntpTick;         /**< NTP授时成功瞬间的HAL_Tick值 */
     uint32_t              ntpUnixTimestamp; /**< NTP授时时的UTC Unix时间戳 */
+    uint8_t               weatherSendPending; /**< 天气CIPSEND等待'>'提示 */
+    uint8_t               weatherSendReady;   /**< 天气CIPSEND已可发送HTTP */
+    uint8_t               weatherSendError;   /**< 天气CIPSEND返回ERROR/busy */
     uint8_t               weatherPending;  /**< 天气HTTP查询等待标志(1=正在等待响应) */
-    char                  weatherRxBuf[1024]; /**< 天气HTTP响应接收缓冲区 */
+    char                  weatherRxBuf[2048]; /**< 天气HTTP响应接收缓冲区 */
     uint16_t              weatherRxLen;    /**< 天气响应已接收字节数 */
     char                  cipdomainResult[20]; /**< AT+CIPDOMAIN解析结果(点分十进制IP) */
 } ESP01S_Instance_t;
@@ -101,6 +104,7 @@ static void ESP01S_RxCallback(UartDrv_RxData_t *pData, void *pUserCtx);     /**<
 static int  ESP01S_RestoreTcpTransparent(void);                              /**< 恢复TCP连接并进入透传模式 */
 static void ESP01S_ProcessATResponse(const char *pstr, uint16_t len);        /**< AT响应解析与状态推进 */
 static void ESP01S_ParseUdpNtpData(const uint8_t *pBuf, uint16_t len);      /**< +IPD中的UDP NTP数据解析 */
+static uint8_t ESP01S_BufferContains(const uint8_t *buf, uint16_t len, const char *needle);
 static void UnixToDateTime(uint32_t timestamp, int timezoneHrs, ESP01S_NtpTime_t *pTime); /**< Unix时间戳转日期时间 */
 static uint32_t DateTimeToUnix(const ESP01S_NtpTime_t *pTime, int timezoneHrs);           /**< 日期时间转Unix时间戳 */
 static uint8_t DecToBcd(uint8_t dec);   /**< 十进制转BCD */
@@ -285,13 +289,13 @@ int ESP01S_Start(void)
 void ESP01S_ExitTransparent(void)
 {
     /* 前导静默: 确保之前的数据发送已完成 */
-    ESP01S_DELAY(500);
+    ESP01S_DELAY(1200);
 
     /* 发送退出命令: 不加换行符! */
     ESP01S_SendATCmd("+++", 500);
 
     /* 后续静默: 等待模块识别退出命令 */
-    ESP01S_DELAY(500);
+    ESP01S_DELAY(1200);
 
     /* 状态回退到TCP已连接 */
     s_esp01s.state = ESP01S_STATE_TCP_CONNECTED;
@@ -694,6 +698,24 @@ static const char* ESP01S_JsonExtractString(const char *json, const char *key, c
     return out;
 }
 
+static uint8_t ESP01S_BufferContains(const uint8_t *buf, uint16_t len, const char *needle)
+{
+    if (buf == NULL || needle == NULL || *needle == '\0')
+        return 0;
+
+    size_t needleLen = strlen(needle);
+    if (needleLen > len)
+        return 0;
+
+    for (uint16_t i = 0; i <= (uint16_t)(len - needleLen); ++i)
+    {
+        if (memcmp(&buf[i], needle, needleLen) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
 /**
  * @brief  恢复TCP服务器连接并进入透传模式
  * @retval 0:成功  -3:TCP连接失败
@@ -770,6 +792,8 @@ int ESP01S_QueryWeather(const char *apiKey, const char *location,
 
     /* 关闭已有连接,为新建HTTP连接腾出单连接通道 */
     ESP01S_SendATCmd("AT+CIPCLOSE\r\n", 500);
+    ESP01S_SendATCmd("AT+CIPMODE=0\r\n", 500);
+    ESP01S_SendATCmd("AT+CIPMUX=0\r\n", 500);
 
     /* 建立到心知天气服务器的TCP连接(HTTP端口80)
      *
@@ -808,19 +832,29 @@ int ESP01S_QueryWeather(const char *apiKey, const char *location,
              apiKey, location, language, unit);
     reqLen = (uint16_t)strlen(req);
 
-    /* 设置天气查询等待标志,回调将缓存所有原始响应数据 */
+    /* 通过AT+CIPSEND发送HTTP请求. 先等待ESP8266返回'>'提示,避免把
+     * CIPSEND阶段的ERROR/busy响应误缓存为HTTP正文。 */
+    s_esp01s.weatherSendPending = 1;
+    s_esp01s.weatherSendReady = 0;
+    s_esp01s.weatherSendError = 0;
+    snprintf(sendCmd, sizeof(sendCmd), "AT+CIPSEND=%d\r\n", reqLen);
+    ESP01S_SendATCmd(sendCmd, 1000);
+    s_esp01s.weatherSendPending = 0;
+    if (s_esp01s.weatherSendReady == 0 || s_esp01s.weatherSendError != 0)
+    {
+        printf("[ESP01S] 天气CIPSEND未就绪\r\n");
+        ret = -3;
+        goto WEATHER_RESTORE;
+    }
+
+    /* 设置天气查询等待标志,回调只缓存HTTP响应数据。 */
     s_esp01s.weatherPending = 1;
     s_esp01s.weatherRxLen = 0;
     s_esp01s.weatherRxBuf[0] = '\0';
-
-    /* 通过AT+CIPSEND发送HTTP请求 */
-    snprintf(sendCmd, sizeof(sendCmd), "AT+CIPSEND=%d\r\n", reqLen);
-    ESP01S_SendATCmd(sendCmd, 200);
     UartDrv_Send(s_esp01s.pUartDrv, (uint8_t *)req, reqLen);
-    ESP01S_DELAY(500);
 
     /* 等待HTTP响应(心知天气响应通常在1~3秒内返回) */
-    ESP01S_DELAY(4000);
+    ESP01S_DELAY(6000);
 
     s_esp01s.weatherPending = 0;
 
@@ -1269,6 +1303,20 @@ static void ESP01S_RxCallback(UartDrv_RxData_t *pData, void *pUserCtx)
             ESP01S_ParseUdpNtpData(pData->rx_buf, pData->rx_len);
             if (pInst->ntpTimeValid)
                 return;  /* NTP数据已解析,不再做字符串处理 */
+        }
+
+        if (pInst->weatherSendPending)
+        {
+            if (ESP01S_BufferContains(pData->rx_buf, pData->rx_len, ">"))
+            {
+                pInst->weatherSendReady = 1;
+            }
+            if (ESP01S_BufferContains(pData->rx_buf, pData->rx_len, "ERROR") ||
+                ESP01S_BufferContains(pData->rx_buf, pData->rx_len, "busy"))
+            {
+                pInst->weatherSendError = 1;
+            }
+            return;
         }
 
         /* 天气HTTP查询等待中: 缓存原始响应数据供后续解析 */
