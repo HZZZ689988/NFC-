@@ -29,7 +29,6 @@ struct GUI_FONT {
 
 static const GUI_FONT g_default_font = {0};
 static const GUI_FONT *g_current_font = &g_default_font;
-const GUI_FONT GUI_FontHZ_SimSun_16 = {0};
 const GUI_FONT GUI_FontHZ_SimSun_24 = {0};
 
 static void require_int(int condition, const char *message)
@@ -122,23 +121,23 @@ static void test_display_draws_ready_then_releases_event(void)
     att_display_set_weather("Hangzhou Sunny/20C");
 
     att_display_poll(10u);
-    require_int(strcmp(line_at(0), "NFC Attend D7") == 0, "ready page should show device id");
-    require_int(strcmp(line_at(1), "NET READY") == 0, "ready page should show network state");
-    require_int(strcmp(line_at(2), "REC:2 UP:ON") == 0, "ready page should show records and upload flag");
-    require_int(strcmp(line_at(3), "Hangzhou Sunny/20C") == 0, "ready page should show weather");
-    require_int(strcmp(line_at(5), "READY 10s") == 0, "ready page should show current seconds");
+    require_int(g_line_count == 2u, "ready page should use two 24px lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24, "ready page should use SimSun 24");
+    require_int(strcmp(line_at(0), "TAP CARD") == 0, "ready page should show tap prompt");
+    require_int(strcmp(line_at(4), "NET READY") == 0, "ready page should show network state");
 
     att_display_show_attendance_ok(3u, 1001u, 11u);
     att_display_poll(11u);
-    require_int(strcmp(line_at(2), "REC:3 UP:ON") == 0, "attendance OK should increment record count");
-    require_int(strcmp(line_at(5), "OK SEQ:3") == 0, "attendance OK should show seq");
-    require_int(strcmp(line_at(6), "SID:1001") == 0, "attendance OK should show SID");
+    require_int(g_line_count == 2u, "attendance OK should use two 24px lines");
+    require_int(strcmp(line_at(0), "OK") == 0, "attendance OK should show OK");
+    require_int(strcmp(line_at(4), "ID1001") == 0, "attendance OK should show SID");
 
     att_display_poll(15u);
-    require_int(strcmp(line_at(5), "OK SEQ:3") == 0, "event page should hold before timeout");
+    require_int(strcmp(line_at(0), "OK") == 0, "event page should hold before timeout");
 
     att_display_poll(16u);
-    require_int(strcmp(line_at(5), "READY 16s") == 0, "event page should release after timeout");
+    require_int(strcmp(line_at(0), "TAP CARD") == 0, "event page should release after timeout");
+    require_int(strcmp(line_at(4), "NET READY") == 0, "ready page should restore network state");
 }
 
 static void test_display_draws_oled_gbk_demo_string(void)
@@ -148,19 +147,15 @@ static void test_display_draws_oled_gbk_demo_string(void)
     att_display_show_oled_test();
     att_display_poll(0u);
 
-    require_int(g_line_count == 3u, "OLED test should draw three comparison lines");
-    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_16,
-                "OLED test line 0 should draw with SimSun 16");
-    require_int(g_lines[1].font == &GUI_FontHZ_SimSun_16,
-                "OLED test line 1 should draw with SimSun 16");
-    require_int(g_lines[2].font == &GUI_FontHZ_SimSun_24,
-                "OLED test line 2 should draw with SimSun 24");
-    require_int(strcmp(g_lines[0].text, "16 OLED TEST") == 0,
-                "OLED test line 0 should draw 16px title");
-    require_int(strcmp(g_lines[1].text, "16 NET OK") == 0,
-                "OLED test line 1 should draw 16px status");
-    require_int(strcmp(g_lines[2].text, "24 OK") == 0,
-                "OLED test line 2 should draw 24px text");
+    require_int(g_line_count == 2u, "OLED test should draw two 24px lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
+                "OLED test line 0 should draw with SimSun 24");
+    require_int(g_lines[1].font == &GUI_FontHZ_SimSun_24,
+                "OLED test line 1 should draw with SimSun 24");
+    require_int(strcmp(g_lines[0].text, "24 OLED") == 0,
+                "OLED test line 0 should draw 24px title");
+    require_int(strcmp(g_lines[1].text, "OK TEST") == 0,
+                "OLED test line 1 should draw 24px status");
     require_int(g_char_count == 0u, "OLED test should not use the direct character path");
 }
 

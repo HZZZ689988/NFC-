@@ -9,7 +9,6 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
-extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_16;
 extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_24;
 #endif
 
@@ -95,9 +94,9 @@ static void set_event(att_display_event_t event, uint32_t now_sec)
 }
 
 #if ATT_ENABLE_DISPLAY
-static void draw_line(uint8_t row, const char *text)
+static void draw_big_line(uint8_t line, const char *text)
 {
-    GUI_DispStringAt(text, 0, (int)row * 8);
+    GUI_DispStringAt(text, 0, line == 0u ? 0 : 32);
 }
 
 static void draw_oled_test_screen(void)
@@ -107,11 +106,9 @@ static void draw_oled_test_screen(void)
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
 
-    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_16);
-    GUI_DispStringAt("16 OLED TEST", 0, 0);
-    GUI_DispStringAt("16 NET OK", 0, 18);
-    GUI_SetFont(&GUI_FontHZ_SimSun_24);
-    GUI_DispStringAt("24 OK", 0, 40);
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_24);
+    draw_big_line(0u, "24 OLED");
+    draw_big_line(1u, "OK TEST");
     GUI_SetFont(old_font);
     GUI_Update();
 }
@@ -119,6 +116,9 @@ static void draw_oled_test_screen(void)
 static void draw_status_screen(uint32_t now_sec)
 {
     char line[32];
+    const GUI_FONT GUI_UNI_PTR *old_font;
+
+    (void)now_sec;
 
     if (s_display.event == ATT_DISPLAY_EVENT_OLED_TEST) {
         draw_oled_test_screen();
@@ -127,50 +127,34 @@ static void draw_status_screen(uint32_t now_sec)
 
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
-
-    snprintf(line, sizeof(line), "NFC Attend D%lu", (unsigned long)s_display.device_id);
-    draw_line(0u, line);
-
-    draw_line(1u, network_text(s_display.network));
-
-    snprintf(line, sizeof(line), "REC:%lu UP:%s",
-             (unsigned long)s_display.record_count,
-             s_display.upload_enable ? "ON" : "OFF");
-    draw_line(2u, line);
-
-    if (s_display.weather[0] != '\0') {
-        draw_line(3u, s_display.weather);
-    } else {
-        draw_line(3u, "WEATHER --");
-    }
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_24);
 
     switch (s_display.event) {
     case ATT_DISPLAY_EVENT_ATTEND_OK:
-        snprintf(line, sizeof(line), "OK SEQ:%lu", (unsigned long)s_display.last_seq);
-        draw_line(5u, line);
-        snprintf(line, sizeof(line), "SID:%lu", (unsigned long)s_display.last_sid);
-        draw_line(6u, line);
+        draw_big_line(0u, "OK");
+        snprintf(line, sizeof(line), "ID%lu", (unsigned long)s_display.last_sid);
+        draw_big_line(1u, line);
         break;
     case ATT_DISPLAY_EVENT_DUPLICATE:
-        draw_line(5u, "DUPLICATE");
-        draw_line(6u, "TRY LATER");
+        draw_big_line(0u, "DUP");
+        draw_big_line(1u, "WAIT");
         break;
     case ATT_DISPLAY_EVENT_INVALID:
-        draw_line(5u, "INVALID CARD");
-        draw_line(6u, "CHECK CRC/UID");
+        draw_big_line(0u, "BAD CARD");
+        draw_big_line(1u, "CHECK");
         break;
     case ATT_DISPLAY_EVENT_ERROR:
-        draw_line(5u, "ERROR");
-        draw_line(6u, s_display.message[0] ? s_display.message : "UNKNOWN");
+        draw_big_line(0u, "ERROR");
+        draw_big_line(1u, s_display.message[0] ? s_display.message : "UNKNOWN");
         break;
     case ATT_DISPLAY_EVENT_READY:
     default:
-        snprintf(line, sizeof(line), "READY %lus", (unsigned long)now_sec);
-        draw_line(5u, line);
-        draw_line(6u, "TAP CARD");
+        draw_big_line(0u, "TAP CARD");
+        draw_big_line(1u, network_text(s_display.network));
         break;
     }
 
+    GUI_SetFont(old_font);
     GUI_Update();
 }
 #endif
