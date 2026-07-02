@@ -1261,3 +1261,114 @@ indexes or invalid 16-byte hex payloads before calling the card writer, and an
 incomplete image update returns `ERR:NOT_READY`. This validates the non-RC522
 protocol boundary for image-card commands; real Mifare writes still require
 RC522 communication to be restored.
+
+## RC522 Replacement Hardware Minimal Diagnostic
+
+Date: 2026-07-02.
+
+The user replaced the RC522 hardware. The RC522-only diagnostic firmware was
+rebuilt and flashed again:
+
+```text
+make RC522_ONLY_DIAG=1 -j4 -> passed, text=108728 data=496 bss=46112
+program build_rc522_only/RC522_Only_Diag.elf verify reset exit -> Verified OK
+```
+
+The active diagnostic/app pin map for this run was:
+
+```text
+RC522 VCC        -> 3.3V
+RC522 GND        -> PB10, firmware-controlled low
+RC522 NSS/SDA/CS -> PE15
+RC522 SCK        -> PD9
+RC522 MOSI       -> PA0
+RC522 MISO       -> PB13
+RC522 RST        -> PB15
+RC522 IRQ        -> not connected
+```
+
+Serial output captured from `COM3`:
+
+```text
+RC522_ONLY:RAW=0xFF|VER=0xFF|CMD=0xFF->0xFF|IRQ=0xFF->0xFF|FIFO=0xFF->0xFF|TX=0xFF->0xFF|ERR=0xFF->0xFF|PINS=0x59->0x59|SHARE=0|SPD=0xFF->0xFF->0xFF|RW=0|MISO=0x03|DRVVER=00/00/00|MAP=DEMO=00/00/00,H1=FF/FF/FF,H2=FF/FF/FF|PERM=H1=none,H2=none|REQ=255|TAG=0000|SCAN=255|UID=00000000
+```
+
+Repeated lines were stable with the same values.
+
+Interpretation:
+
+- `VER=0xFF` is not a valid MFRC522 version value; expected healthy values are
+  normally `0x91` or `0x92`.
+- `RW=0` means the diagnostic write/read-back test did not work.
+- `MISO=0x03` means the current MISO pin reads high with no pull and pull-up,
+  but can be pulled low internally. That is consistent with MISO being idle or
+  not driven by the RC522, rather than a valid SPI response.
+- `MAP=...` and `PERM=H1=none,H2=none` mean the diagnostic also tried the known
+  demo/H1/H2 candidate header maps and did not find a valid version register.
+- `SCAN=255` and `UID=00000000` confirm no card UID was read.
+
+Conclusion: swapping the RC522 module alone did not change the firmware-visible
+failure mode. The MCU still does not receive a valid MFRC522 register response,
+so the investigation should focus below the attendance business logic: BSP demo
+parity, the board-to-module signal path, PB10-as-ground margin under load,
+PE15/PD9/PA0/PB13/PB15 continuity and whether the RC522 MISO signal reaches the
+MCU pin.
+
+## RC522 BSP Demo And GPIO-Level Cross-Check
+
+Date: 2026-07-02.
+
+The BSP reference demo at `D:\c_work\BSP\Demo_RC522` was analyzed and tested.
+Its RC522 path uses the same signal map as the active diagnostic firmware:
+
+```text
+GND PB10, NSS PE15, SCK PD9, MOSI PA0, MISO PB13, RST PB15
+```
+
+The demo initializes `USART1` on `PA9/PA10` at 115200 baud, calls
+`RC522_Platform_Init()`, calls `RC522_ConfigISOType('A')`, and polls
+`RC522_ScanCard()` every 500 ms. Although `MX_SPI1_Init()` is present, RC522
+communication is software SPI in `../Bsp/NFC/rc522_platform_stm32.c`, not the
+STM32 SPI1 peripheral.
+
+The BSP prebuilt firmware was flashed directly:
+
+```text
+program D:\c_work\BSP\Demo_RC522\build\debug\NFCAttend.elf verify reset exit -> Verified OK
+COM3 -> RC522 NFC Reader Demo Started
+```
+
+No `Card Detected` or UID line appeared during the observation window.
+
+The RC522-only diagnostic was then extended with two lower-level checks:
+
+- `DEMOLOW`: configure the active RC522 pins with BSP-demo-style low-speed GPIO,
+  MOSI idle low and the same RST pulse sequence, then read `VersionReg`.
+- `GPIOCHK`: drive MCU output pins low and high and read them back; `3` means
+  both low and high states were observed, and `GNDL=1` means PB10 was held low.
+
+Build/download result:
+
+```text
+make RC522_ONLY_DIAG=1 -j4 -> passed, text=109328 data=496 bss=46112
+program build_rc522_only/RC522_Only_Diag.elf verify reset exit -> Verified OK
+```
+
+Representative serial output:
+
+```text
+RC522_ONLY:RAW=0xFF|VER=0xFF|CMD=0xFF->0xFF|IRQ=0xFF->0xFF|FIFO=0xFF->0xFF|TX=0xFF->0xFF|ERR=0xFF->0xFF|PINS=0x59->0x59|SHARE=0|SPD=0xFF->0xFF->0xFF|RW=0|MISO=0x03|DRVVER=00/00/00|DEMOLOW=00/00/00|GPIOCHK=NSS=3/SCK=3/MOSI=3/RST=3/GNDL=1|MAP=DEMO=00/00/00,H1=FF/FF/FF,H2=FF/FF/FF|PERM=H1=none,H2=none|REQ=255|TAG=0000|SCAN=255|UID=00000000
+```
+
+Interpretation:
+
+- The official BSP demo starts correctly but does not report a card UID.
+- `DEMOLOW=00/00/00` means the BSP-demo-style low-speed GPIO path also failed
+  to read a valid MFRC522 version register.
+- `GPIOCHK=NSS=3/SCK=3/MOSI=3/RST=3/GNDL=1` confirms the firmware can control
+  the MCU-side output pins and hold PB10 low.
+- The repeated invalid version values therefore are not explained by the
+  attendance business logic, image/card protocol logic, or the STM32 SPI1
+  peripheral. The remaining focus is the RC522 link itself: module orientation
+  by signal name, PB10-as-ground voltage under load, continuity from PE15/PD9/
+  PA0/PB13/PB15 to the module, and whether the RC522 is actually driving MISO.

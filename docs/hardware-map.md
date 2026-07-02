@@ -12,7 +12,7 @@ Source: extracted CubeMX/BSP materials under `extracted/C_work`.
 | --- | --- | --- |
 | OLED | I2C1 | PB6/PB7 |
 | W25Q128 | SPI1 | PA5/PA6/PA7, CS PC4 |
-| RC522 | Software SPI | Header column A: NSS PB13, SCK PB11, MOSI PC4, MISO PA1, RST PA2 |
+| RC522 | Software SPI | Active diagnostic/app map: GND PB10, NSS PE15, SCK PD9, MOSI PA0, MISO PB13, RST PB15 |
 | PC serial | USART1 | PA9/PA10 |
 | ESP01S | USART6 | PC6/PC7 |
 | Keys | GPIO | PE1-PE6 |
@@ -22,54 +22,49 @@ Source: extracted CubeMX/BSP materials under `extracted/C_work`.
 
 ## RC522 Wiring
 
-Use one complete RC522 header column. Do not mix pins between the two columns.
-The firmware is configured for column A, using the header order
-`3.3V/GND/RST/MISO/MOSI/SCK/NSS/extra`.
+The current active firmware and RC522-only diagnostic image use the remapped
+header with PB10 acting as a controlled low level for the RC522 ground pin:
 
-If the RC522 module silkscreen is ordered from the opposite end as
-`NSS/SCK/MOSI/MISO/RST/GND/3.3V`, connect by signal name, not by the same
-physical order. With column A this means the RC522 signal side maps to
-`PB13/PB11/PC4/PA1/PA2/GND/3.3V`.
-
-| RC522 module pin | Column A STM32 pin/header label |
+| RC522 module pin | STM32 pin/header label |
 | --- | --- |
 | `3.3V` | `3.3V` |
-| `GND` | `GND` |
-| `RST` | `PA2` |
-| `MISO` | `PA1` |
-| `MOSI` | `PC4` |
-| `SCK` | `PB11` |
-| `NSS` / `SDA` / `CS` | `PB13` |
-| `IRQ` / unused extra pin | `ETH` |
+| `GND` | `PB10`, firmware drives push-pull low |
+| `RST` | `PB15` |
+| `MISO` | `PB13` |
+| `MOSI` | `PA0` |
+| `SCK` | `PD9` |
+| `NSS` / `SDA` / `CS` | `PE15` |
+| `IRQ` | not connected |
 
-Column B is physically present as `3.3V`, `GND`, `PC1`, `PA7`, `PC5`, `PB12`,
-`NC`. It is not the active firmware mapping because the last RC522 signal would
-land on `NC` with the same header ordering. Its extra label is `RM11`.
-
-Column A shares `PC4` with the existing W25Q128 chip-select label in the base
-project. Treat the real board validation of RC522 plus W25Q128 as required
-before marking hardware complete.
-
-Current known-good firmware assumptions:
+Current active firmware assumptions:
 
 ```text
-RC522 NSS/SDA/CS -> PB13
-RC522 SCK        -> PB11
-RC522 MOSI       -> PC4
-RC522 MISO       -> PA1
-RC522 RST        -> PA2
-RC522 GND        -> GND
-RC522 3.3V       -> 3.3V
+RC522 VCC        -> 3.3V
+RC522 GND        -> PB10, firmware-controlled low
+RC522 NSS/SDA/CS -> PE15
+RC522 SCK        -> PD9
+RC522 MOSI       -> PA0
+RC522 MISO       -> PB13
+RC522 RST        -> PB15
+RC522 IRQ        -> not connected
 ```
 
-Do not move only one or two signal wires to column B. If the module must use
-the second column, the firmware pin map and the physical module orientation must
-be redesigned together because column B does not expose the same seven signals.
+Older candidate header maps are still scanned by the RC522-only diagnostic as
+`H1` and `H2`, but they are not the active application mapping:
 
-The current board-side RC522 diagnostic returned `RC522_VER=0x00`, so the UID
-read path is not validated yet. That result points to RC522 power/orientation,
-RST/NSS/SCK/MOSI/MISO wiring, or the `PC4` hardware conflict, not to a missing
-card alone.
+- `H1`: NSS PA2, SCK PA1, MOSI PC4, MISO PB11, RST PB13.
+- `H2`: NSS PC1, SCK PA7, MOSI PC5, MISO PB12, no RST candidate.
+
+The current board-side RC522 diagnostic has returned `RC522_VER=0x00` on the
+old hardware and `RC522_VER=0xFF` on the replacement hardware. Neither is a
+valid MFRC522 version value. A healthy MFRC522 clone normally returns `0x91` or
+`0x92`. The BSP prebuilt RC522 demo starts on the board but does not report a
+UID, and the enhanced diagnostic reports `DEMOLOW=00/00/00` plus
+`GPIOCHK=NSS=3/SCK=3/MOSI=3/RST=3/GNDL=1`. These results show that the MCU-side
+GPIOs can be driven, while the RC522 still does not return a valid SPI register
+response. With a module that works on another board, prioritize this board's
+RC522 signal path and assumptions: PB10-as-ground margin under load,
+PE15/PD9/PA0/PB13/PB15 continuity and whether MISO reaches PB13.
 
 Do not power the RC522 from 5 V.
 

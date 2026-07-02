@@ -160,6 +160,20 @@ static void rc522_only_gpio_input(GPIO_TypeDef *port, uint16_t pin, uint32_t pul
     HAL_GPIO_Init(port, &GPIO_InitStruct);
 }
 
+static void rc522_only_gpio_output_speed(GPIO_TypeDef *port,
+                                         uint16_t pin,
+                                         GPIO_PinState level,
+                                         uint32_t speed)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    HAL_GPIO_WritePin(port, pin, level);
+    GPIO_InitStruct.Pin = pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = speed;
+    HAL_GPIO_Init(port, &GPIO_InitStruct);
+}
+
 static void rc522_only_reset_candidate_pins(const rc522_pin_t *pins, size_t pin_count)
 {
     for (size_t i = 0u; i < pin_count; ++i) {
@@ -203,6 +217,76 @@ static uint8_t rc522_only_map_read_reg(const rc522_pin_map_t *map,
     HAL_GPIO_WritePin(map->nss_port, map->nss_pin, GPIO_PIN_SET);
     delay_us(delay);
     return value;
+}
+
+static void rc522_only_configure_demo_low_speed(void)
+{
+    rc522_only_gpio_output_speed(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET, GPIO_SPEED_FREQ_LOW);
+    rc522_only_gpio_output_speed(NFC_MOSI_GPIO_Port, NFC_MOSI_Pin, GPIO_PIN_RESET, GPIO_SPEED_FREQ_LOW);
+    rc522_only_gpio_output_speed(NFC_NSS_GPIO_Port, NFC_NSS_Pin, GPIO_PIN_SET, GPIO_SPEED_FREQ_LOW);
+    rc522_only_gpio_output_speed(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_RESET, GPIO_SPEED_FREQ_LOW);
+    rc522_only_gpio_input(NFC_MISO_GPIO_Port, NFC_MISO_Pin, GPIO_NOPULL);
+    rc522_only_gpio_output_speed(NFC_SCK_GPIO_Port, NFC_SCK_Pin, GPIO_PIN_RESET, GPIO_SPEED_FREQ_LOW);
+}
+
+static uint8_t rc522_only_demo_low_read_version(uint8_t delay, uint8_t sample_falling)
+{
+    rc522_only_configure_demo_low_speed();
+
+    HAL_GPIO_WritePin(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_SET);
+    HAL_Delay(10);
+    HAL_GPIO_WritePin(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_RESET);
+    HAL_Delay(10);
+    HAL_GPIO_WritePin(NFC_RST_GPIO_Port, NFC_RST_Pin, GPIO_PIN_SET);
+    HAL_Delay(20);
+
+    return rc522_only_direct_read_reg(RC522_REG_VERSION, delay, sample_falling);
+}
+
+static uint8_t rc522_only_check_output_pin(GPIO_TypeDef *port, uint16_t pin)
+{
+    uint8_t result = 0u;
+
+    rc522_only_gpio_output_speed(port, pin, GPIO_PIN_RESET, GPIO_SPEED_FREQ_LOW);
+    delay_us(20);
+    if (HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_RESET) {
+        result |= 0x01u;
+    }
+
+    HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);
+    delay_us(20);
+    if (HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_SET) {
+        result |= 0x02u;
+    }
+
+    return result;
+}
+
+static uint8_t rc522_only_check_gnd_low(void)
+{
+    rc522_only_gpio_output_speed(NFC_GND_GPIO_Port, NFC_GND_Pin, GPIO_PIN_RESET, GPIO_SPEED_FREQ_LOW);
+    delay_us(20);
+    return (uint8_t)(HAL_GPIO_ReadPin(NFC_GND_GPIO_Port, NFC_GND_Pin) == GPIO_PIN_RESET);
+}
+
+static void rc522_only_gpio_self_test(char *out, size_t out_len)
+{
+    uint8_t nss = rc522_only_check_output_pin(NFC_NSS_GPIO_Port, NFC_NSS_Pin);
+    uint8_t sck = rc522_only_check_output_pin(NFC_SCK_GPIO_Port, NFC_SCK_Pin);
+    uint8_t mosi = rc522_only_check_output_pin(NFC_MOSI_GPIO_Port, NFC_MOSI_Pin);
+    uint8_t rst = rc522_only_check_output_pin(NFC_RST_GPIO_Port, NFC_RST_Pin);
+    uint8_t gnd_low = rc522_only_check_gnd_low();
+
+    snprintf(out,
+             out_len,
+             "NSS=%u/SCK=%u/MOSI=%u/RST=%u/GNDL=%u",
+             (unsigned int)nss,
+             (unsigned int)sck,
+             (unsigned int)mosi,
+             (unsigned int)rst,
+             (unsigned int)gnd_low);
+
+    RC522_Platform_Init();
 }
 
 static void rc522_only_scan_pin_maps(char *out, size_t out_len)
@@ -432,7 +516,11 @@ static void rc522_only_print_diag(void)
     uint8_t direct_rise_1us = rc522_only_direct_read_reg(RC522_REG_VERSION, 1u, 0u);
     uint8_t direct_rise_5us = rc522_only_direct_read_reg(RC522_REG_VERSION, 5u, 0u);
     uint8_t direct_fall_1us = rc522_only_direct_read_reg(RC522_REG_VERSION, 1u, 1u);
+    uint8_t demo_low_rise_1us = rc522_only_demo_low_read_version(1u, 0u);
+    uint8_t demo_low_rise_5us = rc522_only_demo_low_read_version(5u, 0u);
+    uint8_t demo_low_fall_1us = rc522_only_demo_low_read_version(1u, 1u);
     char map_scan[64];
+    char gpio_self[80];
     static char perm_scan[180];
     static uint8_t perm_scan_done = 0u;
 
@@ -441,8 +529,9 @@ static void rc522_only_print_diag(void)
         rc522_only_scan_permutations(perm_scan, sizeof(perm_scan));
         perm_scan_done = 1u;
     }
+    rc522_only_gpio_self_test(gpio_self, sizeof(gpio_self));
 
-    printf("RC522_ONLY:RAW=0x%02X|VER=0x%02X|CMD=0x%02X->0x%02X|IRQ=0x%02X->0x%02X|FIFO=0x%02X->0x%02X|TX=0x%02X->0x%02X|ERR=0x%02X->0x%02X|PINS=0x%02X->0x%02X|SHARE=%u|SPD=0x%02X->0x%02X->0x%02X|RW=%u|MISO=0x%02X|DRVVER=%02X/%02X/%02X|MAP=%s|PERM=%s|REQ=%d|TAG=%02X%02X|SCAN=%d|UID=%02X%02X%02X%02X\r\n",
+    printf("RC522_ONLY:RAW=0x%02X|VER=0x%02X|CMD=0x%02X->0x%02X|IRQ=0x%02X->0x%02X|FIFO=0x%02X->0x%02X|TX=0x%02X->0x%02X|ERR=0x%02X->0x%02X|PINS=0x%02X->0x%02X|SHARE=%u|SPD=0x%02X->0x%02X->0x%02X|RW=%u|MISO=0x%02X|DRVVER=%02X/%02X/%02X|DEMOLOW=%02X/%02X/%02X|GPIOCHK=%s|MAP=%s|PERM=%s|REQ=%d|TAG=%02X%02X|SCAN=%d|UID=%02X%02X%02X%02X\r\n",
            raw_version,
            version,
            raw_command,
@@ -466,6 +555,10 @@ static void rc522_only_print_diag(void)
            direct_rise_1us,
            direct_rise_5us,
            direct_fall_1us,
+           demo_low_rise_1us,
+           demo_low_rise_5us,
+           demo_low_fall_1us,
+           gpio_self,
            map_scan,
            perm_scan,
            request_status,
