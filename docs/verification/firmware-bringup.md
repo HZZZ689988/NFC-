@@ -99,3 +99,4 @@ updated: 2026-07-02
 - [ ] L4 indicates storage/card/network fault.
 - [ ] L5 indicates network-online transition.
 - [ ] TIM3_CH1 PB4 buzzer emits the mapped short tones for attendance and network feedback.
+- [x] `CFG?` and `LIST:3` still report persisted config and uploaded records after DAP reset.

@@ -641,3 +641,44 @@ Expected physical behavior:
 Host tests now cover the `UITEST` command routing and the sparse 24px OLED event
 pages. Physical OLED/LED/buzzer observation still requires watching the board
 during the command sequence.
+
+### UITEST Serial Pass
+
+Date: 2026-07-02.
+
+The board accepted the full `UITEST` command sequence over `COM3`:
+
+```text
+UITEST:READY   -> OK:UITEST
+UITEST:OK      -> OK:UITEST
+UITEST:DUP     -> OK:UITEST
+UITEST:INVALID -> OK:UITEST
+UITEST:ERROR   -> OK:UITEST
+UITEST:NETOK   -> OK:UITEST
+UITEST:NETERR  -> OK:UITEST
+UITEST:READY   -> OK:UITEST
+```
+
+The event-hold behavior was also exercised:
+
+```text
+UITEST:OK -> OK:UITEST
+wait about 6 seconds
+PING      -> OK:PONG
+UITEST:READY -> OK:UITEST
+```
+
+After a DAP reset, persisted config and uploaded records were still available:
+
+```text
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+LIST:COUNT=2
+REC:SEQ=1|UID=A1B2C3D4|SID=1001|NORMAL|1782996646|DEV=1|OK|UP=DONE
+REC:SEQ=2|UID=A1B2C3D5|SID=1002|NORMAL|1782996812|DEV=1|OK|UP=DONE
+LIST:END
+PING -> OK:PONG
+```
+
+This confirms the command-level UI/feedback harness and LittleFS persistence
+after reset. Physical OLED/LED/buzzer pass/fail still depends on visual/audio
+observation during the sequence above.
