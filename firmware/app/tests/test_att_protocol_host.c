@@ -185,6 +185,7 @@ static void test_list_streams_records(void)
     g_records[1].seq = 2u;
     g_records[1].sid = 1002u;
     g_records[1].type = ATT_RECORD_OUT;
+    g_records[1].upload_state = ATT_UPLOAD_DONE;
 
     send_capture_t capture = {0};
     att_status_t status = att_protocol_handle_line("LIST:1", capture_send, &capture);
@@ -192,7 +193,7 @@ static void test_list_streams_records(void)
     require_int(status == ATT_OK, "LIST should return ATT_OK");
     require_int(strcmp(capture.text,
                        "LIST:COUNT=2\n"
-                       "REC:SEQ=2|UID=A1B2C3D4|SID=1002|OUT|1782691200|DEV=7|OK\n"
+                       "REC:SEQ=2|UID=A1B2C3D4|SID=1002|OUT|1782691200|DEV=7|OK|UP=DONE\n"
                        "LIST:END\n") == 0,
                 "LIST should stream newest requested record");
 }

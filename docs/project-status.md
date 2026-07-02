@@ -25,7 +25,8 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - Firmware now writes and reads the card account block at Mifare sector 0 block 1 with UID, SID, points, card type and CRC16.
 - Firmware now handles image-card block commands `IMGAxx`, `IMGNxx`, `IMGDxx` and `UPDATEIMG`, writing only Mifare data blocks and requiring a complete same-UID image update session.
 - Local NFC attendance uses the validated card account SID instead of UID-only records.
-- `LIST:N` and `LIST:ALL` now stream stored attendance records as `REC:` lines after `LIST:COUNT`.
+- `LIST:<count>` and `LIST:ALL` now stream stored attendance records as `REC:` lines after `LIST:COUNT`, including upload state as `UP=PENDING/DONE/FAILED`.
+- `SIMATT:<uid>,<sid>,<type>` can inject a simulated attendance record through the app layer while RC522 is paused.
 - The upper-computer serial client now treats `UID:` and `OK:*` replies as transaction terminators, so `READ`, `ISSUE`, image writes and clear commands do not wait for avoidable timeouts.
 - Firmware now links the OLED BSP and an `att_display` module; the display task shows device ID, record count, upload enable state, network state, weather placeholder, standby prompt and attendance OK/duplicate/invalid/error results.
 - ESP01S startup can write NTP time into STM32 RTC; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
@@ -54,6 +55,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - Empty board storage returns `LIST:COUNT=0` and `LIST:END`.
 - OLED initializes and displays the sparse 24px `OLEDTEST` page.
 - ESP01S connects WiFi, syncs NTP into RTC, connects TCP to `server/server.py` and sends heartbeat.
+- Simulated attendance upload reaches `server/server.py`, receives `ACK:UPLOAD:<seq>` and persists `UP=DONE` in LittleFS.
 
 ## Not Yet Hardware Validated
 
@@ -61,7 +63,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - RC522 card account block read/write with CRC16 and UID consistency on a real card.
 - RC522 image-card write flow: 24 portrait blocks, 10 name blocks, 10 department blocks and `UPDATEIMG`.
 - USART1 `LIST:<count>` / `LIST:ALL` record streaming after real persistent attendance records exist.
-- ESP01S real attendance `UPLOAD:` plus `ACK:UPLOAD:<seq>` round trip.
+- ESP01S real RC522-driven attendance `UPLOAD:` plus `ACK:UPLOAD:<seq>` round trip.
 - Weather query/cache.
 - RTC retention and RTC-derived attendance timestamps on real LSE/VBAT conditions.
 - OLED normal runtime pages, including standby, attendance result, network state and weather pages.
@@ -70,6 +72,6 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 ## Main Risks
 
 - Some original BSP comments are mojibake, but the C interfaces are usable.
-- Network ACK parsing is host-tested. Firmware marks records uploaded only after receiving `ACK:UPLOAD:<seq>`, but this path still needs board-side validation with a real or injected attendance record.
+- Network ACK parsing and `att_storage_mark_uploaded()` are board-validated with an injected attendance record; real RC522-driven upload still needs card input.
 - RC522 register communication is paused and remains the main blocker for the full attendance loop.
 - LittleFS currently uses the whole W25Q128. If raw Flash areas are needed later, the volume must be partitioned or offset.

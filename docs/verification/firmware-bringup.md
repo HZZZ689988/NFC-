@@ -79,12 +79,13 @@ updated: 2026-07-02
 - [x] USART1 accepts segmented `CFG:` writes and persists `/config.bin` on W25Q128/LittleFS.
 - [x] `CFG:` WiFi/server/weather/timezone changes are reflected in ESP01S startup behavior after config write.
 - [x] USART1 `LIST:1` and `LIST:ALL` return `LIST:COUNT=0` and `LIST:END` on empty board storage.
-- [ ] USART1 `LIST:<count>` and `LIST:ALL` stream stored `REC:` lines after offline attendance records exist.
+- [x] USART1 `LIST:<count>` streams stored `REC:` lines after simulated attendance records exist.
 - [x] ESP01S connects WiFi.
 - [x] NTP sync updates RTC.
 - [ ] RTC keeps valid time across reset/VBAT conditions and attendance timestamps use RTC Unix seconds.
 - [x] ESP01S TCP connects to `server/server.py`.
-- [ ] TCP upload reaches `server/server.py`.
+- [x] TCP upload reaches `server/server.py`.
+- [x] `ACK:UPLOAD:<seq>` marks the uploaded record as `UP=DONE` in LittleFS.
 - [x] Heartbeat reaches `server/server.py`.
 - [x] OLED initializes on I2C1 and responds to `OLEDTEST` with the sparse 24px test page.
 - [ ] OLED displays standby page in normal runtime.

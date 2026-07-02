@@ -47,6 +47,8 @@ static uint8_t s_weather_due;
 static uint8_t s_network_ready;
 static att_display_network_state_t s_network_display_state;
 
+static uint32_t app_now(void);
+
 static void default_serial_send(const char *line, void *ctx)
 {
     (void)line;
@@ -81,6 +83,146 @@ static void set_network_state(att_display_network_state_t state)
 
     att_display_set_network(state);
 }
+
+static int hex_to_nibble(char ch)
+{
+    if (ch >= '0' && ch <= '9') {
+        return ch - '0';
+    }
+    if (ch >= 'a' && ch <= 'f') {
+        return ch - 'a' + 10;
+    }
+    if (ch >= 'A' && ch <= 'F') {
+        return ch - 'A' + 10;
+    }
+    return -1;
+}
+
+static uint8_t parse_uid_hex(const char *text, att_uid_t *uid)
+{
+    if (text == NULL || uid == NULL) {
+        return 0u;
+    }
+
+    for (size_t i = 0u; i < ATT_UID_LEN; ++i) {
+        int hi = hex_to_nibble(text[i * 2u]);
+        int lo = hex_to_nibble(text[i * 2u + 1u]);
+        if (hi < 0 || lo < 0) {
+            return 0u;
+        }
+        uid->bytes[i] = (uint8_t)((hi << 4) | lo);
+    }
+
+    return 1u;
+}
+
+static uint8_t parse_u32_until(const char *text, char terminator, uint32_t max_value,
+                               uint32_t *value, const char **end)
+{
+    if (text == NULL || value == NULL || end == NULL || *text == '\0') {
+        return 0u;
+    }
+
+    uint32_t parsed = 0u;
+    const char *p = text;
+    while (*p != '\0' && *p != terminator) {
+        if (*p < '0' || *p > '9') {
+            return 0u;
+        }
+
+        uint32_t digit = (uint32_t)(*p - '0');
+        if (parsed > (UINT32_MAX - digit) / 10u) {
+            return 0u;
+        }
+        parsed = (parsed * 10u) + digit;
+        if (parsed > max_value) {
+            return 0u;
+        }
+        p++;
+    }
+
+    if (p == text) {
+        return 0u;
+    }
+
+    *value = parsed;
+    *end = p;
+    return 1u;
+}
+
+static att_status_t append_attendance_record(const att_uid_t *uid, uint32_t sid,
+                                             att_record_type_t type, uint32_t now,
+                                             uint32_t *seq_out)
+{
+    if (uid == NULL || seq_out == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    att_record_t record;
+    memset(&record, 0, sizeof(record));
+    record.seq = s_next_seq;
+    record.uid = *uid;
+    record.sid = sid;
+    record.type = type;
+    record.timestamp = now;
+    record.device_id = s_config.device_id;
+    record.upload_state = ATT_UPLOAD_PENDING;
+
+    att_status_t status = att_storage_append_record(&record);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    *seq_out = record.seq;
+    s_next_seq++;
+    s_network_upload_due = 1u;
+    att_display_set_record_count(record.seq);
+    return ATT_OK;
+}
+
+static att_status_t handle_sim_attendance(const char *payload, uint32_t *seq_out,
+                                          uint32_t *sid_out)
+{
+    static const char prefix[] = "SIMATT:";
+    if (payload == NULL || seq_out == NULL || sid_out == NULL ||
+        strncmp(payload, prefix, sizeof(prefix) - 1u) != 0) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    const char *cursor = payload + sizeof(prefix) - 1u;
+    att_uid_t uid;
+    if (parse_uid_hex(cursor, &uid) == 0u || cursor[ATT_UID_HEX_LEN] != ',') {
+        return ATT_ERR_INVALID_ARG;
+    }
+    cursor += ATT_UID_HEX_LEN + 1u;
+
+    uint32_t sid = 0u;
+    const char *end = NULL;
+    if (parse_u32_until(cursor, ',', UINT32_MAX, &sid, &end) == 0u ||
+        *end != ',' || sid == 0u) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    cursor = end + 1u;
+
+    uint32_t type_value = 0u;
+    if (parse_u32_until(cursor, '\0', ATT_RECORD_NORMAL, &type_value, &end) == 0u ||
+        *end != '\0') {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    uint32_t now = app_now();
+    att_status_t status = append_attendance_record(&uid, sid,
+                                                   (att_record_type_t)type_value,
+                                                   now, seq_out);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    *sid_out = sid;
+    emit_feedback(ATT_FEEDBACK_ATTEND_OK);
+    att_display_show_attendance_ok(*seq_out, sid, now);
+    return ATT_OK;
+}
 static att_status_t apply_runtime_config(const att_device_config_t *config, void *ctx)
 {
     (void)ctx;
@@ -107,7 +249,25 @@ static att_status_t apply_runtime_config(const att_device_config_t *config, void
 static void dispatch_serial_line(void)
 {
     s_serial_line[s_serial_line_len] = '\0';
-    (void)att_protocol_handle_line(s_serial_line, s_serial_send, s_serial_send_ctx);
+
+    char payload[ATT_SERIAL_LINE_MAX + 1u];
+    if (att_protocol_parse_frame(s_serial_line, payload, sizeof(payload)) == ATT_OK &&
+        strncmp(payload, "SIMATT:", 7) == 0) {
+        uint32_t seq = 0u;
+        uint32_t sid = 0u;
+        att_status_t status = handle_sim_attendance(payload, &seq, &sid);
+        if (status == ATT_OK) {
+            char response[32];
+            snprintf(response, sizeof(response), "OK:SIMATT:SEQ=%lu\n", (unsigned long)seq);
+            s_serial_send(response, s_serial_send_ctx);
+        } else if (status == ATT_ERR_STORAGE) {
+            s_serial_send("ERR:STORAGE\n", s_serial_send_ctx);
+        } else {
+            s_serial_send("ERR:ARG\n", s_serial_send_ctx);
+        }
+    } else {
+        (void)att_protocol_handle_line(s_serial_line, s_serial_send, s_serial_send_ctx);
+    }
     s_serial_line_len = 0u;
 }
 
@@ -300,17 +460,8 @@ void attendance_app_poll_nfc(void)
         return;
     }
 
-    att_record_t record;
-    memset(&record, 0, sizeof(record));
-    record.seq = s_next_seq;
-    record.uid = person.uid;
-    record.sid = person.sid;
-    record.type = ATT_RECORD_NORMAL;
-    record.timestamp = now;
-    record.device_id = s_config.device_id;
-    record.upload_state = ATT_UPLOAD_PENDING;
-
-    status = att_storage_append_record(&record);
+    uint32_t seq = 0u;
+    status = append_attendance_record(&person.uid, person.sid, ATT_RECORD_NORMAL, now, &seq);
     if (status != ATT_OK) {
         send_line("ATTEND:ERR:STORAGE\n");
         emit_feedback(ATT_FEEDBACK_ERROR);
@@ -321,13 +472,12 @@ void attendance_app_poll_nfc(void)
     s_last_uid = person.uid;
     s_last_uid_time = now;
     s_last_uid_valid = 1u;
-    s_next_seq++;
 
     char line[32];
-    snprintf(line, sizeof(line), "ATTEND:OK:SEQ=%lu\n", (unsigned long)record.seq);
+    snprintf(line, sizeof(line), "ATTEND:OK:SEQ=%lu\n", (unsigned long)seq);
     send_line(line);
     emit_feedback(ATT_FEEDBACK_ATTEND_OK);
-    att_display_show_attendance_ok(record.seq, record.sid, now);
+    att_display_show_attendance_ok(seq, person.sid, now);
 }
 
 void attendance_app_poll_serial(void)

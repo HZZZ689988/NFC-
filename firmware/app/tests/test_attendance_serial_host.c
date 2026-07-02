@@ -11,6 +11,10 @@ typedef struct {
     char text[512];
 } send_capture_t;
 
+static att_record_t g_appended_records[4];
+static uint32_t g_appended_record_count;
+static uint32_t g_now_sec = 1234u;
+
 static void capture_send(const char *line, void *ctx)
 {
     send_capture_t *capture = (send_capture_t *)ctx;
@@ -25,8 +29,24 @@ static void require_int(int condition, const char *message)
     }
 }
 
+static uint32_t fake_now(void *ctx)
+{
+    (void)ctx;
+    return g_now_sec;
+}
+
+static void reset_serial_test_state(void)
+{
+    memset(g_appended_records, 0, sizeof(g_appended_records));
+    g_appended_record_count = 0u;
+    g_now_sec = 1234u;
+    require_int(attendance_app_init() == ATT_OK, "attendance_app_init should succeed");
+    attendance_app_set_time_source(fake_now, NULL);
+}
+
 static void test_dispatches_split_line(void)
 {
+    reset_serial_test_state();
     send_capture_t capture = {0};
     attendance_app_set_serial_send(capture_send, &capture);
 
@@ -39,6 +59,7 @@ static void test_dispatches_split_line(void)
 
 static void test_trims_crlf_and_ignores_empty_lines(void)
 {
+    reset_serial_test_state();
     send_capture_t capture = {0};
     attendance_app_set_serial_send(capture_send, &capture);
 
@@ -48,6 +69,7 @@ static void test_trims_crlf_and_ignores_empty_lines(void)
 
 static void test_discards_overlong_line(void)
 {
+    reset_serial_test_state();
     send_capture_t capture = {0};
     attendance_app_set_serial_send(capture_send, &capture);
 
@@ -62,11 +84,50 @@ static void test_discards_overlong_line(void)
                 "overlong line should be rejected and next line should recover");
 }
 
+static void test_simatt_appends_pending_record(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *command = "SIMATT:A1B2C3D4,1001,2\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "OK:SIMATT:SEQ=1\n") == 0,
+                "SIMATT should acknowledge generated sequence");
+    require_int(g_appended_record_count == 1u, "SIMATT should append one record");
+    require_int(g_appended_records[0].seq == 1u, "SIMATT should assign next sequence");
+    require_int(g_appended_records[0].uid.bytes[0] == 0xA1 &&
+                g_appended_records[0].uid.bytes[3] == 0xD4,
+                "SIMATT should parse UID");
+    require_int(g_appended_records[0].sid == 1001u, "SIMATT should parse SID");
+    require_int(g_appended_records[0].type == ATT_RECORD_NORMAL, "SIMATT should parse record type");
+    require_int(g_appended_records[0].timestamp == g_now_sec, "SIMATT should use app time");
+    require_int(g_appended_records[0].device_id == 1u, "SIMATT should use device id");
+    require_int(g_appended_records[0].upload_state == ATT_UPLOAD_PENDING,
+                "SIMATT should create pending upload");
+}
+
+static void test_simatt_rejects_bad_arguments(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *command = "SIMATT:BAD,1001,2\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)command, strlen(command));
+
+    require_int(strcmp(capture.text, "ERR:ARG\n") == 0, "bad SIMATT should return arg error");
+    require_int(g_appended_record_count == 0u, "bad SIMATT should not append record");
+}
+
 int main(void)
 {
     test_dispatches_split_line();
     test_trims_crlf_and_ignores_empty_lines();
     test_discards_overlong_line();
+    test_simatt_appends_pending_record();
+    test_simatt_rejects_bad_arguments();
     return 0;
 }
 
@@ -160,7 +221,14 @@ void att_storage_default_config(att_device_config_t *config)
 
 att_status_t att_storage_append_record(const att_record_t *record)
 {
-    return record == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+    if (record == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    if (g_appended_record_count >= 4u) {
+        return ATT_ERR_STORAGE;
+    }
+    g_appended_records[g_appended_record_count++] = *record;
+    return ATT_OK;
 }
 
 att_status_t att_storage_read_record(uint32_t index, att_record_t *record)

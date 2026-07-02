@@ -566,3 +566,43 @@ Conclusion: DAP flashing, USART1 bidirectional command handling, W25Q128-backed
 empty record listing, OLED `OLEDTEST`, ESP01S WiFi/NTP/RTC/TCP startup and
 heartbeat-to-server are validated. Real attendance upload remains blocked until
 RC522 card input is resumed or a synthetic record injection path is added.
+
+## Simulated Attendance Upload Closure
+
+Date: 2026-07-02.
+
+RC522 remained paused. A `SIMATT:<uid>,<sid>,<type>` serial command was added to
+generate a pending attendance record through the application layer, so the
+network upload path can be validated without card input.
+
+Validation:
+
+```text
+SIMATT:A1B2C3D4,1001,2 -> OK:SIMATT:SEQ=1
+LIST:3 ->
+  REC:SEQ=1|UID=A1B2C3D4|SID=1001|NORMAL|1782996646|DEV=1|OK|UP=DONE
+```
+
+A second record showed the full pending-to-done transition:
+
+```text
+SIMATT:A1B2C3D5,1002,2 -> OK:SIMATT:SEQ=2
+LIST:3 ->
+  REC:SEQ=2|UID=A1B2C3D5|SID=1002|NORMAL|1782996812|DEV=1|OK|UP=PENDING
+```
+
+Server log:
+
+```text
+2026-07-02T12:53:35  192.168.107.122:29145  UPLOAD:SEQ=2|UID=A1B2C3D5|SID=1002|TYPE=2|TS=1782996812|DEV=1
+```
+
+After the server returned `ACK:UPLOAD:2`, the board reported:
+
+```text
+REC:SEQ=2|UID=A1B2C3D5|SID=1002|NORMAL|1782996812|DEV=1|OK|UP=DONE
+```
+
+Conclusion: record append, pending upload selection, ESP01S transparent TCP
+send, server ACK, `att_storage_mark_uploaded()` and LittleFS persistence of the
+upload state are board-validated without RC522.

@@ -34,6 +34,7 @@ UPDATEIMG
 CLEAR:UID
 LIST:<count>
 LIST:ALL
+SIMATT:A1B2C3D4,1001,2
 CFG?
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
 CFG:SSID=wifi-name
@@ -53,12 +54,13 @@ OK:ISSUE
 OK:IMG
 OK:UPDATEIMG
 OK:CLEAR
+OK:SIMATT:SEQ=13
 ERR:NO_CARD
 ERR:UID_MISMATCH
 ERR:CRC
 ERR:NOT_READY
 LIST:COUNT=12
-REC:SEQ=12|UID=A1B2C3D4|SID=1001|NORMAL|1782691200|DEV=1|OK
+REC:SEQ=12|UID=A1B2C3D4|SID=1001|NORMAL|1782691200|DEV=1|OK|UP=DONE
 LIST:END
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.1.10|PORT=9000|TZ=8|SSID=wifi-name|WLOC=hangzhou
 OK:CFG
@@ -76,6 +78,12 @@ communicating with the RC522 over the configured wiring.
 `LIST:<count>` returns the newest `<count>` records, for example `LIST:1`.
 `LIST:ALL` returns every stored record in storage order. Bad list counts, including
 the literal placeholder `LIST:N`, return `ERR:ARG` without sending a partial list.
+`UP=` reports upload state: `PENDING`, `DONE` or `FAILED`.
+
+`SIMATT:<uid>,<sid>,<type>` is a board-verification command used while RC522 is
+paused. It appends a pending attendance record through the application layer,
+updates the display/feedback path and schedules immediate network upload. The
+record type is `0` for `IN`, `1` for `OUT` and `2` for `NORMAL`.
 
 ## Device Config
 

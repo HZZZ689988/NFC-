@@ -172,6 +172,18 @@ static const char *record_type_text(att_record_type_t type)
     }
 }
 
+static const char *upload_state_text(att_upload_state_t state)
+{
+    switch (state) {
+    case ATT_UPLOAD_DONE:
+        return "DONE";
+    case ATT_UPLOAD_FAILED:
+        return "FAILED";
+    default:
+        return "PENDING";
+    }
+}
+
 static void send_card_status(att_status_t status, const char *ok_line,
                              att_protocol_send_fn send, void *ctx)
 {
@@ -595,13 +607,14 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
             char uid_hex[ATT_UID_HEX_LEN + 1u];
             uid_to_hex(&record.uid, uid_hex);
             snprintf(response, sizeof(response),
-                     "REC:SEQ=%lu|UID=%s|SID=%lu|%s|%lu|DEV=%lu|OK\n",
+                     "REC:SEQ=%lu|UID=%s|SID=%lu|%s|%lu|DEV=%lu|OK|UP=%s\n",
                      (unsigned long)record.seq,
                      uid_hex,
                      (unsigned long)record.sid,
                      record_type_text(record.type),
                      (unsigned long)record.timestamp,
-                     (unsigned long)record.device_id);
+                     (unsigned long)record.device_id,
+                     upload_state_text(record.upload_state));
             send(response, ctx);
         }
 
