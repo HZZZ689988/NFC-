@@ -1036,3 +1036,42 @@ Conclusion: `/config.bin` persists segmented device, mode, upload, repeat,
 timezone, WiFi, server and weather-location settings across reset. Runtime
 network configuration is reapplied after reset, and the board was returned to
 the production configuration.
+
+## PC Tool Serial Integration Check
+
+Date: 2026-07-02.
+
+The desktop upper-computer code path was validated against the live board by
+using `pc_tool.nfc_attendance_tool.SerialClient` and the same protocol command
+builders used by the Tkinter UI. This verifies the serial transaction
+terminators and command formatting without requiring manual GUI clicks.
+
+Host verification:
+
+```text
+python pc_tool/tests/test_core.py -> passed
+python -m compileall pc_tool server -> passed
+```
+
+Board interaction through `COM3`:
+
+```text
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+TIME? -> TIME:1783014212|VALID=1
+WEATHER? -> WEATHER:Light 23C
+WEATHERTEST:PC Link 21C -> OK:WEATHERTEST
+WEATHER? -> WEATHER:PC Link 21C
+WEATHER! -> WEATHER:Light 23C
+WEATHER? -> WEATHER:Light 23C
+LIST:2 ->
+LIST:COUNT=7
+REC:SEQ=6|UID=A1B2C3D9|SID=1006|NORMAL|1782998246|DEV=1|OK|UP=DONE
+REC:SEQ=7|UID=A1B2C3EA|SID=2101|NORMAL|1783013204|DEV=1|OK|UP=DONE
+LIST:END
+```
+
+Conclusion: the upper-computer protocol builders and serial client interoperate
+with the board for config/time/weather diagnostics, weather cache writes, forced
+real weather refresh and multi-line record listing. The temporary PC-link
+weather text was restored to the real Seniverse weather cache before ending the
+test.

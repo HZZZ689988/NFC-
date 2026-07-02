@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback.
+The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, upper-computer serial-client interop, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED/weather display, persistent config write/reload, ESP01S WiFi/NTP/RTC/TCP startup, real Seniverse weather query/cache, heartbeat-to-server, simulated attendance upload ACK, outage-time pending record retention, recovery upload, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback.
 
 ## Implemented
 
@@ -42,6 +42,7 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 
 - `python -m compileall pc_tool server` passed.
 - `python pc_tool/tests/test_core.py` passed.
+- `pc_tool.nfc_attendance_tool.SerialClient` was validated against the live board on `COM3` for `CFG?`, `TIME?`, `WEATHER?`, `WEATHERTEST`, `WEATHER!` and `LIST:2`.
 - `python firmware/app/tests/run_host_tests.py` builds and runs the native C host test executables for protocol routing, USART line buffering, local NFC polling, ESP01S network parsing and network polling schedule.
 - `python tools/run_verification.py` is the default host verification entrypoint; `--firmware-build` adds STM32 clean build and ELF segment permission checks.
 - Native display host tests cover the OLED status model text for standby, network state, weather, attendance OK and event timeout behavior.
