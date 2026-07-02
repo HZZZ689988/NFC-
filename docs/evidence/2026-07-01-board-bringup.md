@@ -831,3 +831,40 @@ Conclusion: `TIME?` now reports current Unix seconds plus a validity flag.
 `VALID=1` means the app time source is RTC/NTP-derived Unix time; `VALID=0`
 would indicate RTOS uptime fallback. This makes the remaining full power-loss
 / VBAT RTC retention test directly observable over `COM3`.
+
+## Power-Cycle Time And Weather Location Check
+
+Date: 2026-07-02.
+
+The user reported that the board had been power-cycled once. After reconnecting
+to `COM3`, the running attendance firmware responded to diagnostics:
+
+```text
+TIME? -> TIME:1783011751|VALID=1
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+```
+
+The weather implementation uses the Seniverse daily forecast endpoint:
+
+```text
+GET /v3/weather/daily.json?key=<WKEY>&location=<WLOC>&language=en&unit=c&start=0&days=1
+Host: api.seniverse.com
+```
+
+The official Seniverse daily weather documentation shows the same query
+parameter shape with `key`, `location`, `language`, `unit`, `start` and `days`.
+Hangzhou was configured as a compact latitude/longitude location:
+
+```text
+CFG:WKEY=|WLOC=30.2741:120.1551 -> OK:CFG
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.2741:120.1551
+WEATHER! -> ERR:NOT_READY
+TIME? -> TIME:1783011807|VALID=1
+```
+
+Conclusion: after the reported power cycle, the application time source still
+returned a valid Unix timestamp over `TIME?`, and the board now persists the
+Hangzhou weather location as `30.2741:120.1551`. `WEATHER!` correctly returned
+`ERR:NOT_READY` because `WKEY` is intentionally empty. A real weather query
+still requires a private Seniverse API key from the user's own account; no
+public key can be safely or legitimately substituted.
