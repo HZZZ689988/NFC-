@@ -9,7 +9,7 @@ status: in-progress
 
 ## Current Focus
 
-The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, W25Q128/LittleFS config, empty record listing, sparse 24px OLED test display, ESP01S WiFi/NTP/RTC/TCP startup and heartbeat-to-server.
+The project is in board-verification mode with RC522 intentionally paused. The STM32 base links the attendance app, RC522, LittleFS, USART1 protocol dispatch, local NFC polling, ESP01S network upload scheduling, upload ACK handling, OLED status display, RTC-backed timestamps, weather cache/display plumbing, local LED/buzzer feedback, and persistent device/network config writes. Non-RC522 paths now have board evidence for DAP flashing, USART1 command handling, W25Q128/LittleFS config and record CRC readback, sparse 24px OLED test display, ESP01S WiFi/NTP/RTC/TCP startup, heartbeat-to-server, simulated attendance upload ACK, DAP-reset RTC-derived timestamps, and physical OLED/LED/buzzer feedback.
 
 ## Implemented
 
@@ -53,11 +53,13 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - CMSIS-DAP flashing and verify/reset.
 - USART1 over `COM3` responds to `PING`, `CFG?`, `LIST:1`, `LIST:ALL` and `OLEDTEST` after repeated commands.
 - W25Q128/LittleFS mounts and loads persistent `/config.bin`.
-- Empty board storage returns `LIST:COUNT=0` and `LIST:END`.
+- Empty board storage returns `LIST:COUNT=0` and `LIST:END`; simulated records are appended and read back through the CRC-checked record path.
 - OLED initializes and displays the sparse 24px `OLEDTEST` page.
 - ESP01S connects WiFi, syncs NTP into RTC, connects TCP to `server/server.py` and sends heartbeat.
+- After a DAP reset, a pre-NTP simulated attendance record used RTC-derived Unix seconds instead of RTOS uptime fallback.
 - Simulated attendance upload reaches `server/server.py`, receives `ACK:UPLOAD:<seq>` and persists `UP=DONE` in LittleFS.
 - `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands are accepted over `COM3` and route through the same display/feedback callbacks as runtime events.
+- Physical observation confirmed the sparse 24px OLED pages, L1-L5 LED mapping and TIM3_CH1 PB4 buzzer feedback for the simulated `UITEST` cases.
 
 ## Not Yet Hardware Validated
 
@@ -67,9 +69,9 @@ The project is in board-verification mode with RC522 intentionally paused. The S
 - USART1 `LIST:<count>` / `LIST:ALL` record streaming after real persistent attendance records exist.
 - ESP01S real RC522-driven attendance `UPLOAD:` plus `ACK:UPLOAD:<seq>` round trip.
 - Weather query/cache.
-- RTC retention and RTC-derived attendance timestamps on real LSE/VBAT conditions.
-- Physical observation of OLED normal runtime pages, including standby, attendance result, network state and weather pages.
-- Physical observation of LED and TIM3_CH1 buzzer feedback on PE8-PE12/PB4 for attendance and network state events.
+- RTC retention on full power-loss/VBAT conditions.
+- Physical observation of OLED weather page after successful weather query/cache.
+- Physical observation of LED and TIM3_CH1 PB4 feedback after real RC522 card events.
 
 ## Main Risks
 

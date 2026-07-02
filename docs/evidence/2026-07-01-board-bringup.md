@@ -685,3 +685,57 @@ observation during the sequence above.
 
 User physical observation on 2026-07-02: buzzer sound, OLED pages and LED
 mapping were approximately correct and matched expectations.
+
+## RTC Timestamp And Upload Retention Check
+
+Date: 2026-07-02.
+
+RC522 remained paused. The board was reset through CMSIS-DAP while `COM3` stayed
+open. A simulated attendance record was injected as soon as the application
+banner appeared and before the next ESP01S NTP/RTC sync log line.
+
+Pre-NTP command and readback:
+
+```text
+SIMATT:A1B2C3D8,1005,2 -> OK:SIMATT:SEQ=5
+LIST:10 ->
+  REC:SEQ=5|UID=A1B2C3D8|SID=1005|NORMAL|1782998227|DEV=1|OK|UP=PENDING
+```
+
+The fresh NTP sync then completed:
+
+```text
+[ESP01S] NTP...: 2026-07-02 13:17:19
+[ESP01S] RTC...: 2026-07-02 13:17:25
+RTC synced from ESP01S NTP
+ESP01S network ready
+```
+
+Post-NTP command and readback:
+
+```text
+SIMATT:A1B2C3D9,1006,2 -> OK:SIMATT:SEQ=6
+LIST:10 ->
+  REC:SEQ=6|UID=A1B2C3D9|SID=1006|NORMAL|1782998246|DEV=1|OK|UP=PENDING
+```
+
+After the upload worker received server ACKs, both records were persisted as
+uploaded:
+
+```text
+REC:SEQ=5|UID=A1B2C3D8|SID=1005|NORMAL|1782998227|DEV=1|OK|UP=DONE
+REC:SEQ=6|UID=A1B2C3D9|SID=1006|NORMAL|1782998246|DEV=1|OK|UP=DONE
+```
+
+Server evidence:
+
+```text
+2026-07-02T13:17:28  192.168.107.122:33534  UPLOAD:SEQ=5|UID=A1B2C3D8|SID=1005|TYPE=2|TS=1782998227|DEV=1
+2026-07-02T13:17:39  192.168.107.122:33534  UPLOAD:SEQ=6|UID=A1B2C3D9|SID=1006|TYPE=2|TS=1782998246|DEV=1
+```
+
+Conclusion: after a DAP reset, `AttendanceTime_Now()` returned RTC-derived Unix
+seconds immediately, before the next NTP sync finished. Simulated attendance
+records were appended, read back through the CRC-checked LittleFS record path,
+uploaded, ACKed and marked `UP=DONE`. This verifies DAP-reset RTC continuity; it
+does not replace a full power-loss/VBAT retention test.

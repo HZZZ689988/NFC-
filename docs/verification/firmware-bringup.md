@@ -61,7 +61,7 @@ updated: 2026-07-02
 - [x] W25Q128 ID reads as `0xEF17`.
 - [x] LittleFS formats and mounts on the board.
 - [x] `config.bin` defaults are created on the board.
-- [ ] `records.bin` append/read passes CRC16.
+- [x] `records.bin` append/read passes CRC16 through simulated attendance append and `LIST` readback.
 - [x] RC522 diagnostic command runs over `COM3`.
 - [x] Compare current RC522 driver against `BSP.rar` / `Demo_RC522`.
 - [x] RC522 platform init reconfigures the selected RC522 GPIOs after peripheral init.
@@ -82,7 +82,8 @@ updated: 2026-07-02
 - [x] USART1 `LIST:<count>` streams stored `REC:` lines after simulated attendance records exist.
 - [x] ESP01S connects WiFi.
 - [x] NTP sync updates RTC.
-- [ ] RTC keeps valid time across reset/VBAT conditions and attendance timestamps use RTC Unix seconds.
+- [x] RTC-derived attendance timestamps use valid Unix seconds immediately after DAP reset and before a fresh NTP sync.
+- [ ] RTC keeps valid time across full power-loss/VBAT conditions.
 - [x] ESP01S TCP connects to `server/server.py`.
 - [x] TCP upload reaches `server/server.py`.
 - [x] `ACK:UPLOAD:<seq>` marks the uploaded record as `UP=DONE` in LittleFS.
