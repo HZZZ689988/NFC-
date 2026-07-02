@@ -29,6 +29,8 @@ struct GUI_FONT {
 
 static const GUI_FONT g_default_font = {0};
 static const GUI_FONT *g_current_font = &g_default_font;
+const GUI_FONT GUI_FontHZ_SimSun_16 = {0};
+const GUI_FONT GUI_FontHZ_SimSun_24 = {0};
 
 static void require_int(int condition, const char *message)
 {
@@ -146,23 +148,19 @@ static void test_display_draws_oled_gbk_demo_string(void)
     att_display_show_oled_test();
     att_display_poll(0u);
 
-    require_int(g_line_count == 8u, "OLED test should draw eight ASCII lines");
-    require_int(strcmp(g_lines[0].text, "OLED ASCII TEST") == 0,
-                "OLED test line 0 should draw ASCII title");
-    require_int(strcmp(g_lines[1].text, "0123456789") == 0,
-                "OLED test line 1 should draw digits");
-    require_int(strcmp(g_lines[2].text, "NET READY") == 0,
-                "OLED test line 2 should draw network text");
-    require_int(strcmp(g_lines[3].text, "REC:0001 UP:ON") == 0,
-                "OLED test line 3 should draw record text");
-    require_int(strcmp(g_lines[4].text, "TAP CARD") == 0,
-                "OLED test line 4 should draw tap prompt");
-    require_int(strcmp(g_lines[5].text, "OK SEQ:123") == 0,
-                "OLED test line 5 should draw sequence text");
-    require_int(strcmp(g_lines[6].text, "SID:1001") == 0,
-                "OLED test line 6 should draw SID text");
-    require_int(strcmp(g_lines[7].text, "ERROR? NONE") == 0,
-                "OLED test line 7 should draw error text");
+    require_int(g_line_count == 3u, "OLED test should draw three comparison lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_16,
+                "OLED test line 0 should draw with SimSun 16");
+    require_int(g_lines[1].font == &GUI_FontHZ_SimSun_16,
+                "OLED test line 1 should draw with SimSun 16");
+    require_int(g_lines[2].font == &GUI_FontHZ_SimSun_24,
+                "OLED test line 2 should draw with SimSun 24");
+    require_int(strcmp(g_lines[0].text, "16 OLED TEST") == 0,
+                "OLED test line 0 should draw 16px title");
+    require_int(strcmp(g_lines[1].text, "16 NET OK") == 0,
+                "OLED test line 1 should draw 16px status");
+    require_int(strcmp(g_lines[2].text, "24 OK") == 0,
+                "OLED test line 2 should draw 24px text");
     require_int(g_char_count == 0u, "OLED test should not use the direct character path");
 }
 

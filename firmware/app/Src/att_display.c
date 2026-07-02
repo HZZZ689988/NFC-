@@ -9,6 +9,8 @@
 
 #if ATT_ENABLE_DISPLAY
 #include "GUI.h"
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_16;
+extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_24;
 #endif
 
 #define ATT_DISPLAY_MESSAGE_LEN 24u
@@ -100,17 +102,17 @@ static void draw_line(uint8_t row, const char *text)
 
 static void draw_oled_test_screen(void)
 {
+    const GUI_FONT GUI_UNI_PTR *old_font;
+
     GUI_Clear();
     GUI_SetColor(GUI_COLOR_WHITE);
 
-    draw_line(0u, "OLED ASCII TEST");
-    draw_line(1u, "0123456789");
-    draw_line(2u, "NET READY");
-    draw_line(3u, "REC:0001 UP:ON");
-    draw_line(4u, "TAP CARD");
-    draw_line(5u, "OK SEQ:123");
-    draw_line(6u, "SID:1001");
-    draw_line(7u, "ERROR? NONE");
+    old_font = GUI_SetFont(&GUI_FontHZ_SimSun_16);
+    GUI_DispStringAt("16 OLED TEST", 0, 0);
+    GUI_DispStringAt("16 NET OK", 0, 18);
+    GUI_SetFont(&GUI_FontHZ_SimSun_24);
+    GUI_DispStringAt("24 OK", 0, 40);
+    GUI_SetFont(old_font);
     GUI_Update();
 }
 
