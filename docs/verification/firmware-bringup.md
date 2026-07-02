@@ -93,11 +93,12 @@ updated: 2026-07-02
 - [ ] OLED displays attendance OK, duplicate, invalid-card and error pages after real RC522 card events.
 - [ ] OLED displays ESP01S network state and latest weather text after network/weather integration.
 - [ ] LittleFS `/weather.txt` is created/updated after successful weather query and reloaded on reboot.
-- [ ] L1 indicates attendance OK on a real card event.
-- [ ] L2 indicates invalid-card or CRC/UID mismatch rejection.
-- [ ] L3 indicates duplicate attendance skip.
-- [ ] L4 indicates storage/card/network fault.
-- [ ] L5 indicates network-online transition.
+- [x] L1 indicates simulated attendance OK through `UITEST`, confirmed by physical observation.
+- [x] L2 indicates simulated invalid-card rejection through `UITEST`, confirmed by physical observation.
+- [x] L3 indicates simulated duplicate attendance skip through `UITEST`, confirmed by physical observation.
+- [x] L4 indicates simulated storage/card/network fault through `UITEST`, confirmed by physical observation.
+- [x] L5 indicates simulated network-online transition through `UITEST`, confirmed by physical observation.
+- [ ] L1-L5 indicate the mapped events after real RC522 card events.
 - [x] TIM3_CH1 PB4 buzzer emits the mapped short tones for simulated attendance and network feedback, confirmed by physical observation.
 - [ ] TIM3_CH1 PB4 buzzer emits the mapped short tones after real RC522 card events.
 - [x] `CFG?` and `LIST:3` still report persisted config and uploaded records after DAP reset.
