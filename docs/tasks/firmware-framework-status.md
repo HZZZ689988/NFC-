@@ -39,10 +39,13 @@ updated: 2026-06-30
 - ESP01S startup NTP result is written into STM32 RTC after network start; attendance timestamps use RTC-derived Unix seconds when RTC is valid and fall back to RTOS uptime otherwise.
 - RTC initialization now preserves an already-marked RTC instead of resetting date/time on every boot.
 - `attendance_app_poll_network()` schedules heartbeat every 60 seconds and pending-upload attempts every 10 seconds when upload is enabled.
+- `attendance_app_poll_network()` prioritizes pending uploads over weather. If an upload frame is sent in a poll, weather is deferred so the ESP01S transparent TCP path is not interrupted.
 - `attendance_app_poll_network()` schedules weather query/cache every 1800 seconds and NTP status checks every 3600 seconds, while avoiding raw NTP AT commands once ESP01S is in transparent TCP mode.
 - When `UPLOAD=0`, `attendance_app_poll_network()` still runs NTP and weather polling but skips heartbeat and pending-record upload attempts.
 - ESP01S transparent TCP data is dispatched through a FreeRTOS queue to `att_network_handle_rx()`, which marks records uploaded only after parsing `ACK:UPLOAD:<seq>`.
-- Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing and network polling schedule.
+- ACK parsing accepts both plain `ACK:UPLOAD:<seq>` and prefixed lines such as `+IPD,...:ACK:UPLOAD:<seq>`.
+- Upload marking skips CRC-bad historical records and marks all valid records with the ACKed sequence, so a bad old record or duplicate sequence does not block backlog replay.
+- Host tests cover protocol routing, USART line buffering, NFC attendance polling, network config bounds, ACK parsing, upload-priority network polling, weather-failure isolation, duplicate-sequence upload marking and pending-upload retry after reinit.
 - `att_card_issue_checked()` writes UID, SID, points, card type and CRC16 to Mifare sector 0 block 1.
 - `att_card_read_person()` reads the same account block, verifies the physical UID against the stored UID and validates CRC16 before exposing person data.
 - `att_card_write_image_block()` maps `IMGAxx`, `IMGNxx` and `IMGDxx` to Mifare data blocks while skipping sector trailers, and requires the same image-card UID throughout an update session.

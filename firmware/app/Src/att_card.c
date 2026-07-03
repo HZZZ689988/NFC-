@@ -41,6 +41,12 @@ static void reset_image_session(void)
     s_department_mask = 0u;
 }
 
+static void prepare_card_scan(void)
+{
+    RC522_Halt();
+    RC522_ConfigISOType('A');
+}
+
 static void put_u32_be(uint8_t *dest, uint32_t value)
 {
     dest[0] = (uint8_t)(value >> 24);
@@ -179,6 +185,7 @@ att_status_t att_card_diag(att_card_diag_t *diag)
     diag->tx_control = RC522_ReadRegister(RC522_REG_TXCONTROL);
     diag->error = RC522_ReadRegister(RC522_REG_ERROR);
     diag->request_status = (int8_t)RC522_Request(RC522_PICC_REQALL, diag->tag_type);
+    RC522_Halt();
     card_unlock();
     return ATT_OK;
 }
@@ -189,10 +196,77 @@ static att_status_t read_uid_selected(att_uid_t *uid)
         return ATT_ERR_INVALID_ARG;
     }
 
-    if (RC522_ScanCard(uid->bytes) != RC522_OK) {
-        return ATT_ERR_NO_CARD;
+    for (uint8_t attempt = 0u; attempt < 3u; ++attempt) {
+        prepare_card_scan();
+        if (RC522_ScanCard(uid->bytes) == RC522_OK) {
+            return ATT_OK;
+        }
     }
+
+    return ATT_ERR_NO_CARD;
+}
+
+static att_status_t reselect_expected_card(const att_uid_t *expected_uid)
+{
+    if (expected_uid == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    RC522_Halt();
+    att_uid_t current_uid;
+    att_status_t status = read_uid_selected(&current_uid);
+    if (status != ATT_OK) {
+        return status;
+    }
+    if (!uid_equal(&current_uid, expected_uid)) {
+        return ATT_ERR_CID_MISMATCH;
+    }
+
     return ATT_OK;
+}
+
+static att_status_t write_block_verified(uint8_t sector, uint8_t block,
+                                         const att_uid_t *uid,
+                                         const uint8_t data[16])
+{
+    if (uid == NULL || data == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    att_status_t last_status = ATT_ERR;
+    for (uint8_t attempt = 0u; attempt < 3u; ++attempt) {
+        last_status = reselect_expected_card(uid);
+        if (last_status == ATT_ERR_CID_MISMATCH) {
+            RC522_Halt();
+            return last_status;
+        }
+        if (last_status != ATT_OK) {
+            continue;
+        }
+
+        last_status = auth_sector(sector, uid);
+        if (last_status != ATT_OK) {
+            RC522_Halt();
+            last_status = ATT_ERR;
+            continue;
+        }
+
+        uint8_t block_data[16];
+        memcpy(block_data, data, sizeof(block_data));
+        if (RC522_WriteBlock(sector, block, block_data) == RC522_OK) {
+            uint8_t verify[16] = {0};
+            if (RC522_ReadBlock(sector, block, verify) == RC522_OK &&
+                memcmp(verify, data, sizeof(verify)) == 0) {
+                RC522_Halt();
+                return ATT_OK;
+            }
+        }
+
+        RC522_Halt();
+        last_status = ATT_ERR;
+    }
+
+    return last_status;
 }
 
 att_status_t att_card_read_uid(att_uid_t *uid)
@@ -369,22 +443,12 @@ att_status_t att_card_write_image_block(att_card_image_area_t area, uint8_t inde
         return status;
     }
 
-    status = auth_sector(sector, &person.uid);
+    status = write_block_verified(sector, block, &person.uid, data);
     if (status != ATT_OK) {
-        RC522_Halt();
         card_unlock();
         return status;
     }
 
-    uint8_t block_data[16];
-    memcpy(block_data, data, sizeof(block_data));
-    if (RC522_WriteBlock(sector, block, block_data) != RC522_OK) {
-        RC522_Halt();
-        card_unlock();
-        return ATT_ERR;
-    }
-
-    RC522_Halt();
     mark_image_block(area, index);
     card_unlock();
     return ATT_OK;

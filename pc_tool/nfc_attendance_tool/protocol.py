@@ -121,6 +121,30 @@ def build_time_query() -> str:
     return "TIME?\n"
 
 
+def build_network_query() -> str:
+    return "NET?\n"
+
+
+def build_ota_status_query() -> str:
+    return "OTA?\n"
+
+
+def build_ota_download() -> str:
+    return "OTA!\n"
+
+
+def build_ota_install_reset() -> str:
+    return "OTARST\n"
+
+
+def build_card_lock(enabled: bool) -> str:
+    return f"CARDLOCK:{'ON' if enabled else 'OFF'}\n"
+
+
+def build_card_lock_query() -> str:
+    return "CARDLOCK?\n"
+
+
 def build_clear(uid_hex: str) -> str:
     return f"CLEAR:{normalize_uid(uid_hex)}\n"
 

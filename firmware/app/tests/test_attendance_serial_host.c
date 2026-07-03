@@ -286,6 +286,29 @@ static void test_time_query_reports_fallback_state(void)
                 "TIME? should mark small uptime fallback as invalid RTC time");
 }
 
+static void test_cardlock_commands_toggle_poll_state(void)
+{
+    reset_serial_test_state();
+    send_capture_t capture = {0};
+    attendance_app_set_serial_send(capture_send, &capture);
+
+    const char *commands =
+        "CARDLOCK?\n"
+        "CARDLOCK:ON\n"
+        "CARDLOCK?\n"
+        "CARDLOCK:OFF\n"
+        "CARDLOCK?\n";
+    attendance_app_dispatch_serial_bytes((const uint8_t *)commands, strlen(commands));
+
+    require_int(strcmp(capture.text,
+                       "CARDLOCK:OFF\n"
+                       "OK:CARDLOCK:ON\n"
+                       "CARDLOCK:ON\n"
+                       "OK:CARDLOCK:OFF\n"
+                       "CARDLOCK:OFF\n") == 0,
+                "CARDLOCK commands should report and toggle poll pause state");
+}
+
 int main(void)
 {
     test_dispatches_split_line();
@@ -301,6 +324,7 @@ int main(void)
     test_weather_test_rejects_bad_text();
     test_time_query_reports_valid_unix_state();
     test_time_query_reports_fallback_state();
+    test_cardlock_commands_toggle_poll_state();
     return 0;
 }
 
@@ -449,5 +473,24 @@ att_status_t att_storage_save_weather(const char *text)
         return ATT_ERR_INVALID_ARG;
     }
     snprintf(g_weather_text, sizeof(g_weather_text), "%s", text);
+    return ATT_OK;
+}
+
+att_status_t att_storage_boot_state_load(att_boot_state_t *state)
+{
+    if (state == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(state, 0, sizeof(*state));
+    return ATT_OK;
+}
+
+att_status_t att_storage_boot_state_save(att_boot_state_t *state)
+{
+    return state == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+}
+
+att_status_t att_storage_boot_confirm_current(void)
+{
     return ATT_OK;
 }

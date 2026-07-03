@@ -103,16 +103,16 @@ Result:
 
 Test setup:
 
-- WiFi SSID: `abc`
-- WiFi password: `abc123456`
+- WiFi SSID: `<test-wifi-ssid>`
+- WiFi password: `<redacted>`
 - PC WLAN IPv4: `192.168.107.234`
 - Test TCP server: `python server/server.py --host 0.0.0.0 --port 9000`
 - Firmware config written through `COM3`:
 
 ```text
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8
-CFG:SSID=abc
-CFG:PWD=abc123456
+CFG:SSID=<test-wifi-ssid>
+CFG:PWD=<redacted>
 CFG:HOST=192.168.107.234|PORT=9000
 CFG:WKEY=|WLOC=hangzhou
 ```
@@ -120,7 +120,7 @@ CFG:WKEY=|WLOC=hangzhou
 Readback through `CFG?`:
 
 ```text
-CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 ```
 
 After reset, the board printed:
@@ -141,7 +141,7 @@ HEARTBEAT:DEV=1
 Result:
 
 - Segmented `CFG:` writes persisted to LittleFS and were readable after write.
-- ESP01S connected to the `abc` 2.4 GHz WiFi network.
+- ESP01S connected to the configured 2.4 GHz WiFi network.
 - UDP NTP sync succeeded and calibrated the STM32 RTC.
 - TCP connection to `server/server.py` succeeded.
 - Heartbeat upload path reached the test server.
@@ -261,7 +261,7 @@ Latest flashed diagnostic after these changes:
 
 ```text
 PING -> OK:PONG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 DIAG? -> DIAG:RC522_RAW=0x00|RC522_VER=0x00|CMD=0x00|IRQ=0x00|FIFO=0x00|TX=0x00|ERR=0x00|PINS=0x35|SHARE=1|REQ=-1|TAG=0000
 READ -> ERR:NO_CARD
 ```
@@ -271,7 +271,7 @@ and tested again from `COM3` after adding the shared-bus guard:
 
 ```text
 PING -> OK:PONG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 DIAG? -> DIAG:RC522_RAW=0x00|RC522_VER=0x00|CMD=0x00|IRQ=0x00|FIFO=0x00|TX=0x00|ERR=0x00|PINS=0x35|SHARE=1|REQ=-1|TAG=0000
 READ -> ERR:NO_CARD
 ```
@@ -534,7 +534,7 @@ Validation after flashing:
 ```text
 OpenOCD: Programming Finished, Verified OK, Resetting Target
 PING -> OK:PONG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 PING -> OK:PONG
 LIST:1 -> LIST:COUNT=0 / LIST:END
 LIST:ALL -> LIST:COUNT=0 / LIST:END
@@ -671,7 +671,7 @@ UITEST:READY -> OK:UITEST
 After a DAP reset, persisted config and uploaded records were still available:
 
 ```text
-CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 LIST:COUNT=2
 REC:SEQ=1|UID=A1B2C3D4|SID=1001|NORMAL|1782996646|DEV=1|OK|UP=DONE
 REC:SEQ=2|UID=A1B2C3D5|SID=1002|NORMAL|1782996812|DEV=1|OK|UP=DONE
@@ -783,7 +783,7 @@ remained intact:
 
 ```text
 WEATHER? -> WEATHER:Sunny 20C
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 ```
 
 The forced real query command was also exercised without a weather API key:
@@ -841,7 +841,7 @@ to `COM3`, the running attendance firmware responded to diagnostics:
 
 ```text
 TIME? -> TIME:1783011751|VALID=1
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=hangzhou
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=hangzhou
 ```
 
 The weather implementation uses the Seniverse daily forecast endpoint:
@@ -858,7 +858,7 @@ The Seniverse common API parameters define coordinate locations as
 
 ```text
 CFG:WKEY=|WLOC=30.267:120.153 -> OK:CFG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 WEATHER! -> ERR:NOT_READY
 TIME? -> TIME:1783011952|VALID=1
 ```
@@ -936,7 +936,7 @@ complete:
 
 ```text
 CFG:HOST=192.168.107.234|PORT=8999 -> OK:CFG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=8999|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=8999|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 SIMATT:A1B2C3EA,2101,2 -> OK:SIMATT:SEQ=7
 LIST:3 ->
 REC:SEQ=7|UID=A1B2C3EA|SID=2101|NORMAL|1783013204|DEV=1|OK|UP=PENDING
@@ -947,7 +947,7 @@ running on `192.168.107.234:9000`:
 
 ```text
 CFG:HOST=192.168.107.234|PORT=9000 -> OK:CFG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 ```
 
 After reconnection and the next upload poll, the same record changed to
@@ -983,7 +983,7 @@ RC522 remained paused. The current production configuration was first read as
 the baseline:
 
 ```text
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 ```
 
 A deliberately non-default configuration was written in segmented `CFG:`
@@ -991,11 +991,11 @@ commands:
 
 ```text
 CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|TZ=9 -> OK:CFG
-CFG:SSID=abc -> OK:CFG
-CFG:PWD=abc123456 -> OK:CFG
+CFG:SSID=<test-wifi-ssid> -> OK:CFG
+CFG:PWD=<redacted> -> OK:CFG
 CFG:HOST=192.168.107.234|PORT=8998 -> OK:CFG
 CFG:WKEY=|WLOC=test-hangzhou -> OK:CFG
-CFG? -> CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|HOST=192.168.107.234|PORT=8998|TZ=9|SSID=abc|WLOC=test-hangzhou
+CFG? -> CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|HOST=192.168.107.234|PORT=8998|TZ=9|SSID=<test-wifi-ssid>|WLOC=test-hangzhou
 ```
 
 After a CMSIS-DAP reset, the temporary configuration was still present:
@@ -1004,7 +1004,7 @@ After a CMSIS-DAP reset, the temporary configuration was still present:
 reset run -> OK
 Attendance app ready
 ESP01S network start failed: -3
-CFG? -> CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|HOST=192.168.107.234|PORT=8998|TZ=9|SSID=abc|WLOC=test-hangzhou
+CFG? -> CFG:DEV=42|MODE=2|UPLOAD=0|REPEAT=7|HOST=192.168.107.234|PORT=8998|TZ=9|SSID=<test-wifi-ssid>|WLOC=test-hangzhou
 ```
 
 The `ESP01S network start failed: -3` result was expected because the temporary
@@ -1013,11 +1013,11 @@ restored. The private weather key was rewritten but not recorded in this file:
 
 ```text
 CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|TZ=8 -> OK:CFG
-CFG:SSID=abc -> OK:CFG
-CFG:PWD=abc123456 -> OK:CFG
+CFG:SSID=<test-wifi-ssid> -> OK:CFG
+CFG:PWD=<redacted> -> OK:CFG
 CFG:HOST=192.168.107.234|PORT=9000 -> OK:CFG
 CFG:WKEY=<redacted>|WLOC=30.267:120.153 -> OK:CFG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 ```
 
 After a second CMSIS-DAP reset, the restored production configuration loaded and
@@ -1028,7 +1028,7 @@ reset run -> OK
 Attendance app ready
 RTC synced from ESP01S NTP
 ESP01S network ready
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 WEATHER? -> WEATHER:Light 23C
 ```
 
@@ -1056,7 +1056,7 @@ python -m compileall pc_tool server -> passed
 Board interaction through `COM3`:
 
 ```text
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 TIME? -> TIME:1783014212|VALID=1
 WEATHER? -> WEATHER:Light 23C
 WEATHERTEST:PC Link 21C -> OK:WEATHERTEST
@@ -1124,7 +1124,7 @@ Board upload-disable check:
 
 ```text
 CFG:DEV=1|MODE=3|UPLOAD=0|REPEAT=60|TZ=8 -> OK:CFG
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=0|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=0|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 SIMATT:A1B2C3ED,2202,2 -> OK:SIMATT:SEQ=11
 LIST:5 ->
 REC:SEQ=11|UID=A1B2C3ED|SID=2202|NORMAL|1783014648|DEV=1|OK|UP=PENDING
@@ -1202,7 +1202,7 @@ into a temporary SQLite database and export a CSV.
 Commands and board responses:
 
 ```text
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 TIME? -> TIME:1783015349|VALID=1
 LIST:5 ->
 LIST:COUNT=11
@@ -1252,7 +1252,7 @@ PING -> OK:PONG
 IMGN10:00112233445566778899AABBCCDDEEFF -> ERR:ARG
 IMGA23:00112233445566778899AABBCCDDEEFG -> ERR:ARG
 UPDATEIMG -> ERR:NOT_READY
-CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=abc|WLOC=30.267:120.153
+CFG? -> CFG:DEV=1|MODE=3|UPLOAD=1|REPEAT=60|HOST=192.168.107.234|PORT=9000|TZ=8|SSID=<test-wifi-ssid>|WLOC=30.267:120.153
 TIME? -> TIME:1783015843|VALID=1
 ```
 

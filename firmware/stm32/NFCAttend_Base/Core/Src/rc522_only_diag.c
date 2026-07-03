@@ -480,6 +480,90 @@ static uint8_t rc522_only_miso_bias_bits(void)
     return bits;
 }
 
+static int rc522_only_status_to_int(char status)
+{
+    uint8_t raw = (uint8_t)status;
+
+    if (raw == (uint8_t)RC522_OK) {
+        return 0;
+    }
+    if (raw == (uint8_t)RC522_ERR) {
+        return -1;
+    }
+    if (raw == (uint8_t)RC522_ERR_NO_TAG) {
+        return -2;
+    }
+    if (raw == (uint8_t)RC522_ERR_COLLISION) {
+        return -3;
+    }
+
+    return (int)raw;
+}
+
+static void rc522_only_print_flow_diag(void)
+{
+    uint8_t tag_type[2] = {0};
+    uint8_t uid[4] = {0};
+    uint8_t key[6] = {0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    uint8_t block0[16] = {0};
+    uint8_t block1[16] = {0};
+    uint8_t block2[16] = {0};
+
+    RC522_Halt();
+    HAL_Delay(5);
+    RC522_ConfigISOType('A');
+
+    char req = RC522_Request(RC522_PICC_REQALL, tag_type);
+    char anticoll = RC522_ERR;
+    char select = RC522_ERR;
+    char auth = RC522_ERR;
+    char read0 = RC522_ERR;
+    char read1 = RC522_ERR;
+    char read2 = RC522_ERR;
+
+    if (req == RC522_OK) {
+        anticoll = RC522_Anticoll(uid);
+    }
+    if (anticoll == RC522_OK) {
+        select = RC522_Select(uid);
+    }
+    if (select == RC522_OK) {
+        auth = RC522_AuthState(RC522_PICC_AUTHENT1A, 3u, key, uid);
+    }
+    if (auth == RC522_OK) {
+        read0 = RC522_Read(0u, block0);
+        read1 = RC522_Read(1u, block1);
+        read2 = RC522_Read(2u, block2);
+    }
+
+    printf("RC522_FLOW:REQ=%d|TAG=%02X%02X|ANTI=%d|SEL=%d|AUTH=%d|R0=%d|R1=%d|R2=%d|UID=%02X%02X%02X%02X|B0=%02X%02X%02X%02X|B1=%02X%02X%02X%02X|B2=%02X%02X%02X%02X\r\n",
+           rc522_only_status_to_int(req),
+           tag_type[0],
+           tag_type[1],
+           rc522_only_status_to_int(anticoll),
+           rc522_only_status_to_int(select),
+           rc522_only_status_to_int(auth),
+           rc522_only_status_to_int(read0),
+           rc522_only_status_to_int(read1),
+           rc522_only_status_to_int(read2),
+           uid[0],
+           uid[1],
+           uid[2],
+           uid[3],
+           block0[0],
+           block0[1],
+           block0[2],
+           block0[3],
+           block1[0],
+           block1[1],
+           block1[2],
+           block1[3],
+           block2[0],
+           block2[1],
+           block2[2],
+           block2[3]);
+}
+
 static void rc522_only_print_diag(void)
 {
     uint8_t tag_type[2] = {0};
@@ -569,6 +653,8 @@ static void rc522_only_print_diag(void)
            uid[1],
            uid[2],
            uid[3]);
+
+    rc522_only_print_flow_diag();
 }
 
 void RC522_Only_Diag_Run(void)

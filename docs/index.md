@@ -13,6 +13,7 @@ updated: 2026-06-29
 - [Protocol](protocol.md)
 - [Hardware map](hardware-map.md)
 - [Storage design](storage-littlefs.md)
+- [Bootloader design](bootloader-design.md)
 - [Firmware task status](tasks/firmware-framework-status.md)
 - [Bring-up checklist](verification/firmware-bringup.md)
 - [Decision: LittleFS storage](decisions/2026-06-29-littlefs-storage.md)

@@ -22,6 +22,16 @@
 #define ATT_NETWORK_WEATHER_INTERVAL_SEC    1800u
 #define ATT_WEATHER_TEXT_LEN                32u
 #define ATT_VALID_UNIX_MIN                  1609459200u
+#define ATT_ADMIN_TIMEOUT_SEC               120u
+#define ATT_ADMIN_DEVICE_ID_MAX             9999u
+#define ATT_LRU_CACHE_SIZE                  8u
+
+typedef struct {
+    uint8_t valid;
+    att_uid_t uid;
+    att_record_t record;
+    uint32_t age;
+} attendance_lru_entry_t;
 
 static att_device_config_t s_config;
 static uint32_t s_next_seq = 1u;
@@ -31,6 +41,8 @@ static attendance_app_time_fn s_time_now;
 static void *s_time_ctx;
 static attendance_feedback_fn s_feedback;
 static void *s_feedback_ctx;
+static attendance_reset_fn s_reset;
+static void *s_reset_ctx;
 static char s_serial_line[ATT_SERIAL_LINE_MAX + 1u];
 static size_t s_serial_line_len;
 static uint8_t s_serial_line_overflow;
@@ -46,11 +58,42 @@ static uint8_t s_network_heartbeat_due;
 static uint8_t s_network_time_sync_due;
 static uint8_t s_weather_due;
 static uint8_t s_network_ready;
+static uint8_t s_card_poll_paused;
 static att_display_network_state_t s_network_display_state;
+static uint8_t s_admin_active;
+static uint8_t s_admin_field;
+static uint32_t s_admin_last_action_sec;
+static att_device_config_t s_admin_config;
+static attendance_lru_entry_t s_lru_cache[ATT_LRU_CACHE_SIZE];
+static uint32_t s_lru_clock;
 
 static uint32_t app_now(void);
 static uint8_t uid_equal(const att_uid_t *left, const att_uid_t *right);
 static uint8_t is_duplicate_uid(const att_uid_t *uid, uint32_t now);
+static void remember_presented_uid(const att_uid_t *uid, uint32_t now);
+static void send_line(const char *line);
+static void admin_check_timeout(uint32_t now);
+static void admin_enter(uint32_t now);
+static void admin_show(const char *message, uint32_t now);
+static void lru_cache_clear(void);
+static uint8_t lru_cache_lookup(const att_uid_t *uid, att_record_t *record);
+static void lru_cache_put(const att_uid_t *uid, const att_record_t *record);
+
+typedef enum {
+    ATTEND_REJECT_NONE = 0,
+    ATTEND_REJECT_ALREADY_IN,
+    ATTEND_REJECT_NO_ENTRY,
+} attendance_reject_t;
+
+static void set_card_poll_paused(uint8_t paused)
+{
+    s_card_poll_paused = paused ? 1u : 0u;
+    if (s_card_poll_paused == 0u) {
+        s_last_uid_valid = 0u;
+        s_last_uid_time = 0u;
+        memset(&s_last_uid, 0, sizeof(s_last_uid));
+    }
+}
 
 static void default_serial_send(const char *line, void *ctx)
 {
@@ -61,6 +104,11 @@ static void default_serial_send(const char *line, void *ctx)
 static void default_feedback(attendance_feedback_event_t event, void *ctx)
 {
     (void)event;
+    (void)ctx;
+}
+
+static void default_reset(void *ctx)
+{
     (void)ctx;
 }
 
@@ -85,6 +133,119 @@ static void set_network_state(att_display_network_state_t state)
     }
 
     att_display_set_network(state);
+}
+
+static att_work_mode_t admin_normalize_mode(att_work_mode_t mode)
+{
+    if (mode == ATT_MODE_CHECK_IN ||
+        mode == ATT_MODE_CHECK_OUT ||
+        mode == ATT_MODE_IN_OUT) {
+        return mode;
+    }
+
+    return ATT_MODE_IN_OUT;
+}
+
+static att_work_mode_t admin_step_mode(att_work_mode_t mode, int8_t delta)
+{
+    uint8_t value = (uint8_t)admin_normalize_mode(mode);
+    if (delta > 0) {
+        value = value >= (uint8_t)ATT_MODE_IN_OUT ? (uint8_t)ATT_MODE_CHECK_IN : (uint8_t)(value + 1u);
+    } else if (delta < 0) {
+        value = value <= (uint8_t)ATT_MODE_CHECK_IN ? (uint8_t)ATT_MODE_IN_OUT : (uint8_t)(value - 1u);
+    }
+    return (att_work_mode_t)value;
+}
+
+static void admin_show(const char *message, uint32_t now)
+{
+    att_display_show_admin(s_admin_config.device_id,
+                           admin_normalize_mode(s_admin_config.work_mode),
+                           s_admin_field,
+                           message,
+                           now);
+}
+
+static void admin_enter(uint32_t now)
+{
+    s_admin_active = 1u;
+    s_admin_field = 0u;
+    s_admin_last_action_sec = now;
+    s_admin_config = s_config;
+    s_admin_config.work_mode = admin_normalize_mode(s_admin_config.work_mode);
+    if (s_admin_config.device_id == 0u) {
+        s_admin_config.device_id = 1u;
+    } else if (s_admin_config.device_id > ATT_ADMIN_DEVICE_ID_MAX) {
+        s_admin_config.device_id = ATT_ADMIN_DEVICE_ID_MAX;
+    }
+    admin_show(NULL, now);
+}
+
+static void admin_check_timeout(uint32_t now)
+{
+    if (s_admin_active == 0u) {
+        return;
+    }
+
+    if ((uint32_t)(now - s_admin_last_action_sec) >= ATT_ADMIN_TIMEOUT_SEC) {
+        s_admin_active = 0u;
+        send_line("ADMIN:TIMEOUT\n");
+        att_display_show_ready(now);
+    }
+}
+
+static void lru_cache_clear(void)
+{
+    memset(s_lru_cache, 0, sizeof(s_lru_cache));
+    s_lru_clock = 0u;
+}
+
+static uint8_t lru_cache_lookup(const att_uid_t *uid, att_record_t *record)
+{
+    if (uid == NULL || record == NULL) {
+        return 0u;
+    }
+
+    for (uint8_t i = 0u; i < ATT_LRU_CACHE_SIZE; ++i) {
+        if (s_lru_cache[i].valid != 0u && uid_equal(&s_lru_cache[i].uid, uid)) {
+            s_lru_cache[i].age = ++s_lru_clock;
+            *record = s_lru_cache[i].record;
+            return 1u;
+        }
+    }
+
+    return 0u;
+}
+
+static void lru_cache_put(const att_uid_t *uid, const att_record_t *record)
+{
+    if (uid == NULL || record == NULL) {
+        return;
+    }
+
+    uint8_t slot = 0u;
+    uint32_t oldest_age = UINT32_MAX;
+    for (uint8_t i = 0u; i < ATT_LRU_CACHE_SIZE; ++i) {
+        if (s_lru_cache[i].valid != 0u && uid_equal(&s_lru_cache[i].uid, uid)) {
+            slot = i;
+            oldest_age = 0u;
+            break;
+        }
+        if (s_lru_cache[i].valid == 0u) {
+            slot = i;
+            oldest_age = 0u;
+            break;
+        }
+        if (s_lru_cache[i].age < oldest_age) {
+            oldest_age = s_lru_cache[i].age;
+            slot = i;
+        }
+    }
+
+    s_lru_cache[slot].valid = 1u;
+    s_lru_cache[slot].uid = *uid;
+    s_lru_cache[slot].record = *record;
+    s_lru_cache[slot].age = ++s_lru_clock;
 }
 
 static int hex_to_nibble(char ch)
@@ -133,6 +294,114 @@ static uint8_t weather_text_is_valid(const char *text)
     }
 
     return 1u;
+}
+
+static const char *record_type_text(att_record_type_t type)
+{
+    switch (type) {
+    case ATT_RECORD_IN:
+        return "IN";
+    case ATT_RECORD_OUT:
+        return "OUT";
+    default:
+        return "NORMAL";
+    }
+}
+
+static att_status_t find_latest_record_for_uid(const att_uid_t *uid,
+                                               att_record_t *record,
+                                               uint8_t *found)
+{
+    if (uid == NULL || record == NULL || found == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    *found = 0u;
+
+    if (lru_cache_lookup(uid, record) != 0u) {
+        *found = 1u;
+        return ATT_OK;
+    }
+
+    uint32_t count = 0u;
+    att_status_t status = att_storage_record_count(&count);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    for (uint32_t i = count; i > 0u; --i) {
+        att_record_t candidate;
+        status = att_storage_read_record(i - 1u, &candidate);
+        if (status != ATT_OK) {
+            return status;
+        }
+
+        if (uid_equal(&candidate.uid, uid)) {
+            *record = candidate;
+            *found = 1u;
+            lru_cache_put(uid, record);
+            return ATT_OK;
+        }
+    }
+
+    return ATT_OK;
+}
+
+static att_status_t decide_attendance_record(const att_uid_t *uid, uint32_t now,
+                                             att_record_type_t *record_type,
+                                             uint32_t *duration_sec,
+                                             attendance_reject_t *reject)
+{
+    if (uid == NULL || record_type == NULL || duration_sec == NULL || reject == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+
+    *record_type = ATT_RECORD_NORMAL;
+    *duration_sec = 0u;
+    *reject = ATTEND_REJECT_NONE;
+
+    if (s_config.work_mode == ATT_MODE_NORMAL) {
+        return ATT_OK;
+    }
+
+    att_record_t latest;
+    uint8_t found = 0u;
+    att_status_t status = find_latest_record_for_uid(uid, &latest, &found);
+    if (status != ATT_OK) {
+        return status;
+    }
+
+    uint8_t is_inside = (uint8_t)(found != 0u && latest.type == ATT_RECORD_IN);
+
+    switch (s_config.work_mode) {
+    case ATT_MODE_CHECK_IN:
+        if (is_inside != 0u) {
+            *reject = ATTEND_REJECT_ALREADY_IN;
+            return ATT_OK;
+        }
+        *record_type = ATT_RECORD_IN;
+        return ATT_OK;
+    case ATT_MODE_CHECK_OUT:
+        if (is_inside == 0u) {
+            *reject = ATTEND_REJECT_NO_ENTRY;
+            return ATT_OK;
+        }
+        *record_type = ATT_RECORD_OUT;
+        *duration_sec = (uint32_t)(now - latest.timestamp);
+        return ATT_OK;
+    case ATT_MODE_IN_OUT:
+        if (is_inside != 0u) {
+            *record_type = ATT_RECORD_OUT;
+            *duration_sec = (uint32_t)(now - latest.timestamp);
+        } else {
+            *record_type = ATT_RECORD_IN;
+        }
+        return ATT_OK;
+    case ATT_MODE_NORMAL:
+    default:
+        *record_type = ATT_RECORD_NORMAL;
+        return ATT_OK;
+    }
 }
 
 static void copy_weather_text(char *dest, size_t dest_len, const char *src)
@@ -214,6 +483,7 @@ static att_status_t append_attendance_record(const att_uid_t *uid, uint32_t sid,
     *seq_out = record.seq;
     s_next_seq++;
     s_network_upload_due = 1u;
+    lru_cache_put(uid, &record);
     att_display_set_record_count(record.seq);
     return ATT_OK;
 }
@@ -269,7 +539,8 @@ static att_status_t handle_sim_attendance(const char *payload, uint32_t *seq_out
     s_last_uid_time = now;
     s_last_uid_valid = 1u;
     emit_feedback(ATT_FEEDBACK_ATTEND_OK);
-    att_display_show_attendance_ok(*seq_out, sid, now);
+    att_display_show_attendance_result(*seq_out, sid, (att_record_type_t)type_value,
+                                       now, 0u, "OK", NULL);
     return ATT_OK;
 }
 
@@ -289,7 +560,8 @@ static att_status_t handle_ui_test(const char *payload)
     }
     if (strcmp(mode, "OK") == 0) {
         emit_feedback(ATT_FEEDBACK_ATTEND_OK);
-        att_display_show_attendance_ok(s_next_seq, 1001u, now);
+        att_display_show_attendance_result(s_next_seq, 1001u, ATT_RECORD_IN,
+                                           now, 0u, "OK", NULL);
         return ATT_OK;
     }
     if (strcmp(mode, "DUP") == 0) {
@@ -377,6 +649,50 @@ static att_status_t query_weather_now(char *weather, size_t weather_len)
 #endif
 }
 
+#if ATT_ENABLE_NETWORK
+static const char *network_state_text(uint8_t state)
+{
+    switch (state) {
+    case 0u:
+        return "IDLE";
+    case 1u:
+        return "AT_OK";
+    case 2u:
+        return "WIFI_CONNECTING";
+    case 3u:
+        return "WIFI_CONNECTED";
+    case 4u:
+        return "TCP_CONNECTING";
+    case 5u:
+        return "TCP_CONNECTED";
+    case 6u:
+        return "TRANSPARENT";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+static const char *ota_state_text(att_ota_state_t state)
+{
+    switch (state) {
+    case ATT_OTA_STATE_IDLE:
+        return "IDLE";
+    case ATT_OTA_STATE_NONE:
+        return "NONE";
+    case ATT_OTA_STATE_AVAILABLE:
+        return "AVAILABLE";
+    case ATT_OTA_STATE_DOWNLOADING:
+        return "DOWNLOADING";
+    case ATT_OTA_STATE_READY:
+        return "READY";
+    case ATT_OTA_STATE_ERROR:
+        return "ERROR";
+    default:
+        return "UNKNOWN";
+    }
+}
+#endif
+
 static void send_weather_response(const char *weather)
 {
     char response[64];
@@ -393,6 +709,118 @@ static void send_time_response(void)
              (unsigned int)(now >= ATT_VALID_UNIX_MIN ? 1u : 0u));
     s_serial_send(response, s_serial_send_ctx);
 }
+
+#if ATT_ENABLE_NETWORK
+static void send_network_response(void)
+{
+    att_network_status_t status;
+    if (att_network_get_status(&status) != ATT_OK) {
+        s_serial_send("ERR:NET\n", s_serial_send_ctx);
+        return;
+    }
+
+    uint8_t link_ready = (status.esp_state == 6u) ? 1u : 0u;
+    char response[256];
+    snprintf(response, sizeof(response),
+             "NET:READY=%u|CFG=%u|UPLOAD=%u|STATE=%u|TEXT=%s|NTP=%u|BL=%u|DEV=%lu|HOST=%s|PORT=%u|SSID=%s\n",
+             (unsigned int)link_ready,
+             (unsigned int)status.configured,
+             (unsigned int)status.upload_enabled,
+             (unsigned int)status.esp_state,
+             network_state_text(status.esp_state),
+             (unsigned int)status.ntp_synced,
+             (unsigned int)status.blacklist_count,
+             (unsigned long)status.device_id,
+             status.server_host,
+             (unsigned int)status.server_port,
+             status.ssid);
+    s_serial_send(response, s_serial_send_ctx);
+}
+
+static void send_ota_response(void)
+{
+    att_ota_status_t status;
+    if (att_network_get_ota_status(&status) != ATT_OK) {
+        s_serial_send("ERR:OTA\n", s_serial_send_ctx);
+        return;
+    }
+
+    att_ota_file_status_t cache;
+    att_status_t cache_status = att_storage_ota_status(&cache);
+    if ((status.state == ATT_OTA_STATE_IDLE ||
+         status.state == ATT_OTA_STATE_NONE ||
+         status.state == ATT_OTA_STATE_ERROR) &&
+        cache_status == ATT_OK &&
+        cache.valid != 0u) {
+        char response[224];
+        snprintf(response, sizeof(response),
+                 "OTA:STATE=CACHED|OK=%u|VER=%s|CUR=%c|SLOT=%c|RX=%lu|SIZE=%lu|CRC32=%08lX|ACT=%08lX|TARGET=%08lX|INSTALL=%lu|ERR=%lu\n",
+                 (unsigned int)cache.verified,
+                 cache.version,
+                 cache.current_slot == 2u ? 'B' : cache.current_slot == 1u ? 'A' : '-',
+                 cache.target_slot == 2u ? 'B' : cache.target_slot == 1u ? 'A' : '-',
+                 (unsigned long)cache.received_bytes,
+                 (unsigned long)cache.size_bytes,
+                 (unsigned long)cache.expected_crc32,
+                 (unsigned long)cache.actual_crc32,
+                 (unsigned long)cache.target_addr,
+                 (unsigned long)cache.install_state,
+                 (unsigned long)cache.install_error);
+        s_serial_send(response, s_serial_send_ctx);
+        return;
+    }
+
+    char response[176];
+    snprintf(response, sizeof(response),
+             "OTA:STATE=%s|VER=%s|SLOT=%c|RX=%lu|SIZE=%lu|CRC32=%08lX|ACT=%08lX\n",
+             ota_state_text(status.state),
+             status.version,
+             status.target_slot == 2u ? 'B' : status.target_slot == 1u ? 'A' : '-',
+             (unsigned long)status.received_bytes,
+             (unsigned long)status.size_bytes,
+             (unsigned long)status.expected_crc32,
+             (unsigned long)status.actual_crc32);
+    s_serial_send(response, s_serial_send_ctx);
+}
+
+static uint8_t ota_cache_is_ready_to_install(void)
+{
+    att_ota_file_status_t cache;
+    if (att_storage_ota_status(&cache) != ATT_OK) {
+        return 0u;
+    }
+
+    if (cache.valid == 0u ||
+        cache.verified == 0u ||
+        cache.size_bytes == 0u ||
+        cache.received_bytes != cache.size_bytes ||
+        cache.size_bytes > ATT_APP_SLOT_SIZE_BYTES ||
+        cache.expected_crc32 != cache.actual_crc32 ||
+        cache.target_addr != ATT_APP_SLOT_BASE_ADDR ||
+        cache.target_slot != ATT_OTA_TARGET_SLOT_ID ||
+        cache.install_error != ATT_OTA_INSTALL_ERR_NONE) {
+        return 0u;
+    }
+
+    return (uint8_t)(cache.install_state == ATT_OTA_INSTALL_PENDING ||
+                     cache.install_state == ATT_OTA_INSTALL_INSTALLING);
+}
+
+static void request_ota_install_reset(void)
+{
+    if (!ota_cache_is_ready_to_install()) {
+        s_serial_send("ERR:OTA_NOT_READY\n", s_serial_send_ctx);
+        return;
+    }
+
+    s_serial_send("OK:OTARST\n", s_serial_send_ctx);
+    if (s_reset == NULL) {
+        s_reset = default_reset;
+        s_reset_ctx = NULL;
+    }
+    s_reset(s_reset_ctx);
+}
+#endif
 
 static att_status_t apply_runtime_config(const att_device_config_t *config, void *ctx)
 {
@@ -470,6 +898,28 @@ static void dispatch_serial_line(void)
         }
     } else if (parsed == ATT_OK && strcmp(payload, "TIME?") == 0) {
         send_time_response();
+#if ATT_ENABLE_NETWORK
+    } else if (parsed == ATT_OK && strcmp(payload, "NET?") == 0) {
+        send_network_response();
+    } else if (parsed == ATT_OK && strcmp(payload, "OTA?") == 0) {
+        send_ota_response();
+    } else if (parsed == ATT_OK && strcmp(payload, "OTA!") == 0) {
+        att_status_t status = att_network_query_ota();
+        s_serial_send(status == ATT_OK ? "OK:OTA\n" :
+                      status == ATT_ERR_NOT_READY ? "ERR:NOT_READY\n" : "ERR:OTA\n",
+                      s_serial_send_ctx);
+    } else if (parsed == ATT_OK && strcmp(payload, "OTARST") == 0) {
+        request_ota_install_reset();
+#endif
+    } else if (parsed == ATT_OK && strcmp(payload, "CARDLOCK:ON") == 0) {
+        set_card_poll_paused(1u);
+        s_serial_send("OK:CARDLOCK:ON\n", s_serial_send_ctx);
+    } else if (parsed == ATT_OK && strcmp(payload, "CARDLOCK:OFF") == 0) {
+        set_card_poll_paused(0u);
+        s_serial_send("OK:CARDLOCK:OFF\n", s_serial_send_ctx);
+    } else if (parsed == ATT_OK &&
+               (strcmp(payload, "CARDLOCK?") == 0 || strcmp(payload, "CARDLOCK:?") == 0)) {
+        s_serial_send(s_card_poll_paused ? "CARDLOCK:ON\n" : "CARDLOCK:OFF\n", s_serial_send_ctx);
     } else {
         (void)att_protocol_handle_line(s_serial_line, s_serial_send, s_serial_send_ctx);
     }
@@ -509,6 +959,17 @@ static uint8_t is_duplicate_uid(const att_uid_t *uid, uint32_t now)
     return (uint8_t)((uint32_t)(now - s_last_uid_time) < (uint32_t)s_config.repeat_interval_sec);
 }
 
+static void remember_presented_uid(const att_uid_t *uid, uint32_t now)
+{
+    if (uid == NULL) {
+        return;
+    }
+
+    s_last_uid = *uid;
+    s_last_uid_time = now;
+    s_last_uid_valid = 1u;
+}
+
 static uint32_t app_now(void)
 {
     if (s_time_now == NULL) {
@@ -525,6 +986,7 @@ att_status_t attendance_app_init(void)
     if (status != ATT_OK) {
         return status;
     }
+    (void)att_storage_boot_confirm_current();
 
     status = att_storage_load_config(&s_config);
     if (status != ATT_OK) {
@@ -535,6 +997,12 @@ att_status_t attendance_app_init(void)
     uint32_t count = 0u;
     if (att_storage_record_count(&count) == ATT_OK) {
         s_next_seq = count + 1u;
+        if (count > 0u) {
+            att_record_t latest;
+            if (att_storage_read_record(count - 1u, &latest) == ATT_OK) {
+                s_next_seq = latest.seq + 1u;
+            }
+        }
     }
 
     s_serial_send = default_serial_send;
@@ -543,6 +1011,8 @@ att_status_t attendance_app_init(void)
     s_time_ctx = NULL;
     s_feedback = default_feedback;
     s_feedback_ctx = NULL;
+    s_reset = default_reset;
+    s_reset_ctx = NULL;
     s_network_display_state = ATT_DISPLAY_NET_OFF;
     att_protocol_set_config_apply(apply_runtime_config, NULL);
 
@@ -564,6 +1034,7 @@ att_status_t attendance_app_init(void)
     s_serial_line_overflow = 0u;
     s_last_uid_valid = 0u;
     s_last_uid_time = 0u;
+    s_card_poll_paused = 0u;
     s_last_network_upload_time = 0u;
     s_last_network_heartbeat_time = 0u;
     s_last_network_time_sync_time = 0u;
@@ -572,6 +1043,11 @@ att_status_t attendance_app_init(void)
     s_network_heartbeat_due = 1u;
     s_network_time_sync_due = 1u;
     s_weather_due = 1u;
+    s_admin_active = 0u;
+    s_admin_field = 0u;
+    s_admin_last_action_sec = 0u;
+    memset(&s_admin_config, 0, sizeof(s_admin_config));
+    lru_cache_clear();
     memset(&s_last_uid, 0, sizeof(s_last_uid));
     return ATT_OK;
 }
@@ -593,6 +1069,86 @@ void attendance_app_set_feedback(attendance_feedback_fn feedback, void *ctx)
     s_feedback = (feedback != NULL) ? feedback : default_feedback;
     s_feedback_ctx = ctx;
 }
+
+void attendance_app_set_reset(attendance_reset_fn reset, void *ctx)
+{
+    s_reset = (reset != NULL) ? reset : default_reset;
+    s_reset_ctx = ctx;
+}
+
+int8_t attendance_app_get_timezone(void)
+{
+    return s_config.timezone;
+}
+
+uint8_t attendance_app_admin_is_active(void)
+{
+    return s_admin_active;
+}
+
+attendance_admin_result_t attendance_app_admin_handle_action(attendance_admin_action_t action)
+{
+    uint32_t now = app_now();
+    admin_check_timeout(now);
+    if (s_admin_active == 0u) {
+        return ATT_ADMIN_RESULT_IGNORED;
+    }
+
+    s_admin_last_action_sec = now;
+
+    switch (action) {
+    case ATT_ADMIN_ACTION_PREV_FIELD:
+    case ATT_ADMIN_ACTION_NEXT_FIELD:
+        s_admin_field = s_admin_field == 0u ? 1u : 0u;
+        admin_show(NULL, now);
+        return ATT_ADMIN_RESULT_HANDLED;
+
+    case ATT_ADMIN_ACTION_DEC:
+        if (s_admin_field == 0u) {
+            if (s_admin_config.device_id > 1u) {
+                s_admin_config.device_id--;
+            }
+        } else {
+            s_admin_config.work_mode = admin_step_mode(s_admin_config.work_mode, -1);
+        }
+        admin_show(NULL, now);
+        return ATT_ADMIN_RESULT_HANDLED;
+
+    case ATT_ADMIN_ACTION_INC:
+        if (s_admin_field == 0u) {
+            if (s_admin_config.device_id < ATT_ADMIN_DEVICE_ID_MAX) {
+                s_admin_config.device_id++;
+            }
+        } else {
+            s_admin_config.work_mode = admin_step_mode(s_admin_config.work_mode, 1);
+        }
+        admin_show(NULL, now);
+        return ATT_ADMIN_RESULT_HANDLED;
+
+    case ATT_ADMIN_ACTION_SAVE:
+        if (att_storage_save_config(&s_admin_config) != ATT_OK) {
+            admin_show("SAVE ERR", now);
+            send_line("ADMIN:ERR:SAVE\n");
+            return ATT_ADMIN_RESULT_HANDLED;
+        }
+        s_config = s_admin_config;
+        att_display_set_config(&s_config);
+        s_admin_active = 0u;
+        admin_show("SAVE RESET", now);
+        send_line("ADMIN:SAVED\n");
+        return ATT_ADMIN_RESULT_SAVED;
+
+    case ATT_ADMIN_ACTION_EXIT:
+        s_admin_active = 0u;
+        att_display_show_ready(now);
+        send_line("ADMIN:EXIT\n");
+        return ATT_ADMIN_RESULT_HANDLED;
+
+    default:
+        return ATT_ADMIN_RESULT_IGNORED;
+    }
+}
+
 void attendance_app_dispatch_serial_bytes(const uint8_t *data, size_t len)
 {
     if (data == NULL) {
@@ -639,6 +1195,13 @@ void attendance_app_dispatch_serial_bytes(const uint8_t *data, size_t len)
 
 void attendance_app_poll_nfc(void)
 {
+    uint32_t now = app_now();
+    admin_check_timeout(now);
+
+    if (s_card_poll_paused != 0u) {
+        return;
+    }
+
     att_person_t person;
     att_status_t status = att_card_read_person(&person);
     if (status == ATT_ERR_NO_CARD) {
@@ -657,7 +1220,45 @@ void attendance_app_poll_nfc(void)
         return;
     }
 
-    uint32_t now = app_now();
+    if (person.card_type == ATT_CARD_ADMIN) {
+        if (is_duplicate_uid(&person.uid, now)) {
+            return;
+        }
+
+        admin_enter(now);
+        remember_presented_uid(&person.uid, now);
+        send_line("ADMIN:ON\n");
+        emit_feedback(ATT_FEEDBACK_ATTEND_OK);
+        return;
+    }
+
+    if (s_admin_active != 0u) {
+        if (is_duplicate_uid(&person.uid, now)) {
+            return;
+        }
+
+        remember_presented_uid(&person.uid, now);
+        send_line("ADMIN:ERR:CARD_DENIED\n");
+        emit_feedback(ATT_FEEDBACK_CARD_INVALID);
+        att_display_show_admin(s_admin_config.device_id,
+                               admin_normalize_mode(s_admin_config.work_mode),
+                               s_admin_field,
+                               "DENY CARD",
+                               now);
+        return;
+    }
+
+#if ATT_ENABLE_NETWORK
+    if (att_network_uid_is_blacklisted(&person.uid) != 0u) {
+        remember_presented_uid(&person.uid, now);
+        send_line("ATTEND:ERR:BLACKLIST\n");
+        emit_feedback(ATT_FEEDBACK_CARD_INVALID);
+        att_display_show_attendance_result(0u, person.sid, ATT_RECORD_NORMAL,
+                                           now, 0u, "ERR", "BLACKLIST");
+        return;
+    }
+#endif
+
     if (is_duplicate_uid(&person.uid, now)) {
         send_line("ATTEND:SKIP:DUPLICATE\n");
         emit_feedback(ATT_FEEDBACK_ATTEND_DUPLICATE);
@@ -666,7 +1267,10 @@ void attendance_app_poll_nfc(void)
     }
 
     uint32_t seq = 0u;
-    status = append_attendance_record(&person.uid, person.sid, ATT_RECORD_NORMAL, now, &seq);
+    att_record_type_t record_type = ATT_RECORD_NORMAL;
+    uint32_t duration_sec = 0u;
+    attendance_reject_t reject = ATTEND_REJECT_NONE;
+    status = decide_attendance_record(&person.uid, now, &record_type, &duration_sec, &reject);
     if (status != ATT_OK) {
         send_line("ATTEND:ERR:STORAGE\n");
         emit_feedback(ATT_FEEDBACK_ERROR);
@@ -674,15 +1278,49 @@ void attendance_app_poll_nfc(void)
         return;
     }
 
-    s_last_uid = person.uid;
-    s_last_uid_time = now;
-    s_last_uid_valid = 1u;
+    if (reject == ATTEND_REJECT_ALREADY_IN) {
+        send_line("ATTEND:ERR:ALREADY_IN\n");
+        emit_feedback(ATT_FEEDBACK_ATTEND_DUPLICATE);
+        att_display_show_attendance_result(0u, person.sid, ATT_RECORD_IN,
+                                           now, 0u, "DUP", "ALREADY IN");
+        remember_presented_uid(&person.uid, now);
+        return;
+    }
 
-    char line[32];
-    snprintf(line, sizeof(line), "ATTEND:OK:SEQ=%lu\n", (unsigned long)seq);
+    if (reject == ATTEND_REJECT_NO_ENTRY) {
+        send_line("ATTEND:ERR:NO_ENTRY\n");
+        emit_feedback(ATT_FEEDBACK_ERROR);
+        att_display_show_attendance_result(0u, person.sid, ATT_RECORD_OUT,
+                                           now, 0u, "ERR", "NO ENTRY");
+        remember_presented_uid(&person.uid, now);
+        return;
+    }
+
+    status = append_attendance_record(&person.uid, person.sid, record_type, now, &seq);
+    if (status != ATT_OK) {
+        send_line("ATTEND:ERR:STORAGE\n");
+        emit_feedback(ATT_FEEDBACK_ERROR);
+        att_display_show_error("STORAGE", now);
+        return;
+    }
+
+    remember_presented_uid(&person.uid, now);
+
+    char line[64];
+    if (record_type == ATT_RECORD_OUT) {
+        snprintf(line, sizeof(line), "ATTEND:OK:SEQ=%lu|TYPE=%s|DUR=%lu\n",
+                 (unsigned long)seq,
+                 record_type_text(record_type),
+                 (unsigned long)duration_sec);
+    } else {
+        snprintf(line, sizeof(line), "ATTEND:OK:SEQ=%lu|TYPE=%s\n",
+                 (unsigned long)seq,
+                 record_type_text(record_type));
+    }
     send_line(line);
     emit_feedback(ATT_FEEDBACK_ATTEND_OK);
-    att_display_show_attendance_ok(seq, person.sid, now);
+    att_display_show_attendance_result(seq, person.sid, record_type,
+                                       now, duration_sec, "OK", NULL);
 }
 
 void attendance_app_poll_serial(void)
@@ -709,8 +1347,36 @@ void attendance_app_poll_network(void)
                                 ATT_DISPLAY_NET_ERROR);
     }
 
-    if (s_weather_due ||
-        (uint32_t)(now - s_last_weather_time) >= ATT_NETWORK_WEATHER_INTERVAL_SEC) {
+    uint8_t upload_busy = 0u;
+    if (!s_config.upload_enable) {
+        upload_busy = 0u;
+    } else {
+        if (s_network_heartbeat_due ||
+            (uint32_t)(now - s_last_network_heartbeat_time) >= ATT_NETWORK_HEARTBEAT_INTERVAL_SEC) {
+            (void)att_network_send_heartbeat();
+            (void)att_network_query_blacklist();
+            s_last_network_heartbeat_time = now;
+            s_network_heartbeat_due = 0u;
+            set_network_state(ATT_DISPLAY_NET_ONLINE);
+        }
+
+        if (s_network_upload_due ||
+            (uint32_t)(now - s_last_network_upload_time) >= ATT_NETWORK_UPLOAD_INTERVAL_SEC) {
+            att_status_t upload_status = att_network_upload_pending_batch(3u);
+            s_last_network_upload_time = now;
+            s_network_upload_due = 0u;
+            if (upload_status == ATT_OK) {
+                upload_busy = 1u;
+                set_network_state(ATT_DISPLAY_NET_UPLOAD);
+            } else {
+                set_network_state(ATT_DISPLAY_NET_ONLINE);
+            }
+        }
+    }
+
+    if (!upload_busy &&
+        (s_weather_due ||
+         (uint32_t)(now - s_last_weather_time) >= ATT_NETWORK_WEATHER_INTERVAL_SEC)) {
         char weather[ATT_WEATHER_TEXT_LEN];
         att_status_t weather_status = att_network_query_weather(weather, sizeof(weather));
         s_last_weather_time = now;
@@ -721,31 +1387,9 @@ void attendance_app_poll_network(void)
             set_network_state(ATT_DISPLAY_NET_ONLINE);
         } else if (weather_status == ATT_ERR_NOT_READY) {
             set_network_state(ATT_DISPLAY_NET_ONLINE);
-        } else {
+        } else if (!s_config.upload_enable) {
             set_network_state(ATT_DISPLAY_NET_ERROR);
         }
-    }
-
-    if (!s_config.upload_enable) {
-        return;
-    }
-
-    if (s_network_heartbeat_due ||
-        (uint32_t)(now - s_last_network_heartbeat_time) >= ATT_NETWORK_HEARTBEAT_INTERVAL_SEC) {
-        (void)att_network_send_heartbeat();
-        s_last_network_heartbeat_time = now;
-        s_network_heartbeat_due = 0u;
-        set_network_state(ATT_DISPLAY_NET_ONLINE);
-    }
-
-    if (s_network_upload_due ||
-        (uint32_t)(now - s_last_network_upload_time) >= ATT_NETWORK_UPLOAD_INTERVAL_SEC) {
-        att_status_t upload_status = att_network_upload_pending();
-        s_last_network_upload_time = now;
-        s_network_upload_due = 0u;
-        set_network_state(upload_status == ATT_OK ?
-                                ATT_DISPLAY_NET_UPLOAD :
-                                ATT_DISPLAY_NET_ONLINE);
     }
 #endif
 }

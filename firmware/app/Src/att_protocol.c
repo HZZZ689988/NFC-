@@ -507,6 +507,10 @@ att_status_t att_protocol_handle_line(const char *line, att_protocol_send_fn sen
             send("ERR:ARG\n", ctx);
             return ATT_ERR_INVALID_ARG;
         }
+        if (card_type > (unsigned int)ATT_CARD_ADMIN) {
+            send("ERR:ARG\n", ctx);
+            return ATT_ERR_INVALID_ARG;
+        }
 
         att_uid_t uid;
         if (parse_uid_hex(uid_hex, &uid) != 0) {

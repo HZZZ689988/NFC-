@@ -85,13 +85,18 @@ updated: 2026-07-02
 - [x] USART1 `LIST:<count>` streams stored `REC:` lines after simulated attendance records exist.
 - [x] Upper-computer `SerialClient` imports live `LIST:5` board records into SQLite and exports CSV with upload state.
 - [x] ESP01S connects WiFi.
+- [x] USART1 `NET?` reports ESP01S runtime state; on 2026-07-03 it diagnosed `<test-router-ssid>` as stuck at `WIFI_CONNECTING` because the visible AP was 5 GHz WPA3-only.
+- [x] 2.4 GHz phone hotspot restores ESP01S networking; `NET?` reached `READY=1|TEXT=TRANSPARENT`, backlog upload `SEQ=115` changed to `UP=DONE`, and fresh `SEQ=116` uploaded to server SQLite.
 - [x] NTP sync updates RTC.
 - [x] RTC-derived attendance timestamps use valid Unix seconds immediately after DAP reset and before a fresh NTP sync.
 - [x] USART1 `TIME?` reports the current app time source and valid/fallback state.
 - [ ] RTC keeps valid time across full power-loss/VBAT conditions.
 - [x] ESP01S TCP connects to `server/server.py`.
 - [x] TCP upload reaches `server/server.py`.
+- [x] Host-side server test confirms valid `UPLOAD:` packets are inserted into SQLite `attendance.db`.
+- [x] Board-side server regression on 2026-07-03 confirmed SQLite upload rows and backlog progression from `SEQ=78` through `SEQ=97`.
 - [x] `ACK:UPLOAD:<seq>` marks the uploaded record as `UP=DONE` in LittleFS.
+- [x] Host-side network scheduler test confirms upload traffic is attempted before weather and weather is skipped while an upload frame is busy.
 - [x] Heartbeat reaches `server/server.py`.
 - [x] OLED initializes on I2C1 and responds to `OLEDTEST` with the sparse 24px test page.
 - [x] USART1 `UITEST:READY/OK/DUP/INVALID/ERROR/NETOK/NETERR` commands trigger OLED/feedback paths and acknowledge over `COM3`.

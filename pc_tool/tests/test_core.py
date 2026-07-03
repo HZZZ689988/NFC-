@@ -14,11 +14,17 @@ from nfc_attendance_tool.protocol import (
     CardType,
     DeviceConfigPayload,
     PersonPayload,
+    build_card_lock,
+    build_card_lock_query,
     build_clear,
     build_config_commands,
     build_crc_frame,
     build_image_block,
     build_issue,
+    build_network_query,
+    build_ota_download,
+    build_ota_install_reset,
+    build_ota_status_query,
     build_time_query,
     build_weather_force_query,
     build_weather_query,
@@ -34,7 +40,12 @@ from server import server as test_server
 def test_protocol_commands() -> None:
     payload = PersonPayload("a1 b2 c3 d4", 1001, 0, CardType.IMAGE)
     assert build_issue(payload) == "ISSUE:A1B2C3D4,1001,0,1\n"
+    admin_payload = PersonPayload("a1b2c3d4", 9001, 0, CardType.ADMIN)
+    assert build_issue(admin_payload) == "ISSUE:A1B2C3D4,9001,0,2\n"
     assert build_clear("a1-b2-c3-d4") == "CLEAR:A1B2C3D4\n"
+    assert build_card_lock(True) == "CARDLOCK:ON\n"
+    assert build_card_lock(False) == "CARDLOCK:OFF\n"
+    assert build_card_lock_query() == "CARDLOCK?\n"
 
 
 def test_crc16_frame_roundtrip() -> None:
@@ -86,6 +97,10 @@ def test_build_weather_commands() -> None:
     assert build_weather_test(" Sunny 20C ") == "WEATHERTEST:Sunny 20C\n"
     assert build_weather_force_query() == "WEATHER!\n"
     assert build_time_query() == "TIME?\n"
+    assert build_network_query() == "NET?\n"
+    assert build_ota_status_query() == "OTA?\n"
+    assert build_ota_download() == "OTA!\n"
+    assert build_ota_install_reset() == "OTARST\n"
 
 
 def test_build_weather_test_rejects_ambiguous_text() -> None:
@@ -357,6 +372,42 @@ def test_serial_transact_accepts_time_response() -> None:
     assert lines == ["TIME:1782999000|VALID=1"]
 
 
+def test_serial_transact_accepts_network_response() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    fake.responses = ["NET:READY=0|CFG=1|UPLOAD=1|STATE=2|TEXT=WIFI_CONNECTING"]
+    client._serial = fake  # type: ignore[attr-defined]
+
+    lines = client.transact("NET?\n", timeout=0.2)
+
+    assert fake.writes == [b"NET?\n"]
+    assert lines == ["NET:READY=0|CFG=1|UPLOAD=1|STATE=2|TEXT=WIFI_CONNECTING"]
+
+
+def test_serial_transact_accepts_ota_response() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    fake.responses = ["OTA:STATE=READY|VER=v1|RX=4|SIZE=4|CRC32=12345678|ACT=12345678"]
+    client._serial = fake  # type: ignore[attr-defined]
+
+    lines = client.transact("OTA?\n", timeout=0.2)
+
+    assert fake.writes == [b"OTA?\n"]
+    assert lines == ["OTA:STATE=READY|VER=v1|RX=4|SIZE=4|CRC32=12345678|ACT=12345678"]
+
+
+def test_serial_transact_accepts_cardlock_query_response() -> None:
+    client = SerialClient()
+    fake = FakeSerial(client)
+    fake.responses = ["CARDLOCK:ON"]
+    client._serial = fake  # type: ignore[attr-defined]
+
+    lines = client.transact("CARDLOCK?\n", timeout=0.2)
+
+    assert fake.writes == [b"CARDLOCK?\n"]
+    assert lines == ["CARDLOCK:ON"]
+
+
 def test_success_response_accepts_ok_prefix() -> None:
     from nfc_attendance_tool.protocol import is_success_response
 
@@ -369,6 +420,7 @@ def test_server_ack_upload_sequence() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         test_server.DATA_DIR = Path(tmp)
         test_server.LOG_FILE = Path(tmp) / "uploads.log"
+        test_server.DB_FILE = Path(tmp) / "attendance.db"
 
         response = test_server.AttendanceHandler.handle_line(
             None,
@@ -377,6 +429,148 @@ def test_server_ack_upload_sequence() -> None:
         )
 
         assert response == "ACK:UPLOAD:42"
+        assert test_server.LOG_FILE.read_text(encoding="utf-8").count("UPLOAD:SEQ=42") == 1
+
+        conn = sqlite3.connect(test_server.DB_FILE)
+        try:
+            row = conn.execute(
+                """
+                SELECT seq, uid, sid, record_type, record_ts, dev, peer
+                FROM uploads
+                WHERE dev = 1 AND seq = 42
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        assert row == (42, "A1B2C3D4", 1001, 2, 1782691200, 1, "127.0.0.1:12345")
+
+
+def test_server_heartbeat_batch_crc_and_blacklist() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        test_server.DATA_DIR = Path(tmp)
+        test_server.LOG_FILE = Path(tmp) / "uploads.log"
+        test_server.DB_FILE = Path(tmp) / "attendance.db"
+
+        heartbeat = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            "HEARTBEAT:DEV=7|TEMP=26.5|FW=1.2.3",
+        )
+        assert heartbeat == "ACK:HEARTBEAT|BL=0"
+
+        batch = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            "UPLOADB:DEV=7|R=50,AABBCCDD,2001,0,1782691201;51,11223344,2002,1,1782691202",
+        )
+        assert batch == "ACK:UPLOADB:50,51"
+
+        payload = "UPLOAD:SEQ=52|UID=55667788|SID=2003|TYPE=2|TS=1782691203|DEV=7"
+        crc_line = f"CRC:{payload}*{test_server._crc16_ccitt_false(payload):04X}"
+        crc_response = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            crc_line,
+        )
+        assert crc_response.startswith("CRC:ACK:UPLOAD:52*")
+
+        conn = sqlite3.connect(test_server.DB_FILE)
+        try:
+            upload_count = conn.execute("SELECT COUNT(*) FROM uploads").fetchone()[0]
+            device = conn.execute(
+                "SELECT dev, heartbeat_count, upload_count, temperature_c, firmware FROM devices WHERE dev = 7"
+            ).fetchone()
+            conn.execute(
+                """
+                INSERT INTO blacklist(uid, sid, reason, active, created_at, updated_at)
+                VALUES('AABBCCDD', 2001, 'lost', 1, '2026-07-03T00:00:00', '2026-07-03T00:00:00')
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        assert upload_count == 3
+        assert device == (7, 1, 3, 26.5, "1.2.3")
+
+        blacklist = test_server.AttendanceHandler.handle_line(None, "127.0.0.1:12345", "BL?")
+        assert blacklist == "BL:COUNT=1|UIDS=AABBCCDD"
+
+
+def test_server_ota_query_and_chunk_protocol() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        test_server.DATA_DIR = Path(tmp)
+        test_server.LOG_FILE = Path(tmp) / "uploads.log"
+        test_server.DB_FILE = Path(tmp) / "attendance.db"
+        ota_dir = Path(tmp) / "ota"
+        ota_dir.mkdir()
+        package = bytes([0x01, 0x02, 0xA5, 0x5A])
+        (ota_dir / "current.bin").write_bytes(package)
+        (ota_dir / "version.txt").write_text("v1", encoding="utf-8")
+
+        crc32 = test_server._crc32_bytes(package)
+        response = test_server.AttendanceHandler.handle_line(None, "127.0.0.1:12345", "OTA?")
+        assert response == f"OTA:VERSION=v1|SIZE=4|CRC32={crc32:08X}|CHUNK=192"
+
+        chunk = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            "OTA:GET:OFFSET=1|LEN=2",
+        )
+        chunk_crc32 = test_server._crc32_bytes(package[1:3])
+        assert chunk == f"OTA:DATA:OFFSET=1|LEN=2|CRC32={chunk_crc32:08X}|HEX=02A5"
+
+        payload = "OTA?"
+        wrapped = f"CRC:{payload}*{test_server._crc16_ccitt_false(payload):04X}"
+        wrapped_response = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            wrapped,
+        )
+        assert wrapped_response.startswith("CRC:OTA:VERSION=v1|SIZE=4|")
+        assert test_server._unwrap_crc(wrapped_response) is not None
+
+
+def test_server_ota_slot_specific_package_protocol() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        test_server.DATA_DIR = Path(tmp)
+        test_server.LOG_FILE = Path(tmp) / "uploads.log"
+        test_server.DB_FILE = Path(tmp) / "attendance.db"
+        ota_dir = Path(tmp) / "ota"
+        ota_dir.mkdir()
+        package_a = bytes([0xAA, 0x01])
+        package_b = bytes([0xBB, 0x02, 0x03])
+        (ota_dir / "current_A.bin").write_bytes(package_a)
+        (ota_dir / "current_B.bin").write_bytes(package_b)
+        (ota_dir / "version_A.txt").write_text("slot-a", encoding="utf-8")
+        (ota_dir / "version_B.txt").write_text("slot-b", encoding="utf-8")
+
+        crc_b = test_server._crc32_bytes(package_b)
+        response = test_server.AttendanceHandler.handle_line(None, "127.0.0.1:12345", "OTA?SLOT=B")
+        assert response == f"OTA:VERSION=slot-b|SIZE=3|CRC32={crc_b:08X}|CHUNK=192|SLOT=B"
+
+        chunk = test_server.AttendanceHandler.handle_line(
+            None,
+            "127.0.0.1:12345",
+            "OTA:GET:OFFSET=1|LEN=2|SLOT=B",
+        )
+        chunk_crc32 = test_server._crc32_bytes(package_b[1:3])
+        assert chunk == f"OTA:DATA:OFFSET=1|LEN=2|CRC32={chunk_crc32:08X}|HEX=0203"
+
+
+def test_server_ota_slot_request_does_not_fall_back_to_legacy_package() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        test_server.DATA_DIR = Path(tmp)
+        test_server.LOG_FILE = Path(tmp) / "uploads.log"
+        test_server.DB_FILE = Path(tmp) / "attendance.db"
+        ota_dir = Path(tmp) / "ota"
+        ota_dir.mkdir()
+        (ota_dir / "current.bin").write_bytes(bytes([0x01, 0x02]))
+        (ota_dir / "version.txt").write_text("legacy", encoding="utf-8")
+
+        response = test_server.AttendanceHandler.handle_line(None, "127.0.0.1:12345", "OTA?SLOT=B")
+        assert response == "OTA:NONE"
 
 
 def _run_tests() -> None:

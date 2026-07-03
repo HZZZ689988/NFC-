@@ -566,3 +566,22 @@ att_status_t att_storage_save_weather(const char *text)
 {
     return text == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
 }
+
+att_status_t att_storage_boot_state_load(att_boot_state_t *state)
+{
+    if (state == NULL) {
+        return ATT_ERR_INVALID_ARG;
+    }
+    memset(state, 0, sizeof(*state));
+    return ATT_OK;
+}
+
+att_status_t att_storage_boot_state_save(att_boot_state_t *state)
+{
+    return state == NULL ? ATT_ERR_INVALID_ARG : ATT_OK;
+}
+
+att_status_t att_storage_boot_confirm_current(void)
+{
+    return ATT_OK;
+}

@@ -25,11 +25,22 @@ void att_display_set_network(att_display_network_state_t state);
 void att_display_set_weather(const char *text);
 void att_display_show_ready(uint32_t now_sec);
 void att_display_show_attendance_ok(uint32_t seq, uint32_t sid, uint32_t now_sec);
+void att_display_show_attendance_result(uint32_t seq, uint32_t sid,
+                                        att_record_type_t record_type,
+                                        uint32_t now_sec,
+                                        uint32_t duration_sec,
+                                        const char *status_text,
+                                        const char *result_text);
 void att_display_show_attendance_duplicate(uint32_t now_sec);
 void att_display_show_attendance_invalid(uint32_t now_sec);
 void att_display_show_error(const char *reason, uint32_t now_sec);
 void att_display_show_weather(uint32_t now_sec);
 void att_display_show_oled_test(void);
+void att_display_show_admin(uint32_t device_id, att_work_mode_t mode,
+                            uint8_t field, const char *message,
+                            uint32_t now_sec);
+uint8_t att_display_page_prev(void);
+uint8_t att_display_page_next(void);
 void att_display_poll(uint32_t now_sec);
 
 #ifdef __cplusplus

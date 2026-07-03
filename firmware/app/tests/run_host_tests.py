@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 INC_DIR = ROOT / "firmware" / "app" / "Inc"
 TEST_DIR = ROOT / "firmware" / "app" / "tests"
 SRC_DIR = ROOT / "firmware" / "app" / "Src"
+LITTLEFS_DIR = ROOT / "firmware" / "third_party" / "littlefs"
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,21 @@ void att_display_show_attendance_ok(uint32_t seq, uint32_t sid, uint32_t now_sec
     (void)sid;
     (void)now_sec;
 }
+void att_display_show_attendance_result(uint32_t seq, uint32_t sid,
+                                        att_record_type_t record_type,
+                                        uint32_t now_sec,
+                                        uint32_t duration_sec,
+                                        const char *status_text,
+                                        const char *result_text)
+{
+    (void)seq;
+    (void)sid;
+    (void)record_type;
+    (void)now_sec;
+    (void)duration_sec;
+    (void)status_text;
+    (void)result_text;
+}
 void att_display_show_attendance_duplicate(uint32_t now_sec) { (void)now_sec; }
 void att_display_show_attendance_invalid(uint32_t now_sec) { (void)now_sec; }
 void att_display_show_error(const char *reason, uint32_t now_sec)
@@ -55,6 +71,18 @@ void att_display_show_error(const char *reason, uint32_t now_sec)
 }
 void att_display_show_weather(uint32_t now_sec) { (void)now_sec; }
 void att_display_show_oled_test(void) {}
+void att_display_show_admin(uint32_t device_id, att_work_mode_t mode,
+                            uint8_t field, const char *message,
+                            uint32_t now_sec)
+{
+    (void)device_id;
+    (void)mode;
+    (void)field;
+    (void)message;
+    (void)now_sec;
+}
+uint8_t att_display_page_prev(void) { return 0u; }
+uint8_t att_display_page_next(void) { return 0u; }
 void att_display_poll(uint32_t now_sec) { (void)now_sec; }
 '''
 
@@ -101,6 +129,21 @@ TESTS = (
         sources=(
             TEST_DIR / "test_att_network_host.c",
             SRC_DIR / "att_network.c",
+            SRC_DIR / "att_crc16.c",
+            SRC_DIR / "att_crc32.c",
+        ),
+    ),
+    HostTest(
+        name="test_att_storage_host",
+        defines=("ATT_STORAGE_MAX_RECORDS=4",),
+        includes=(INC_DIR, LITTLEFS_DIR),
+        sources=(
+            TEST_DIR / "test_att_storage_host.c",
+            SRC_DIR / "att_storage.c",
+            SRC_DIR / "att_crc16.c",
+            SRC_DIR / "att_crc32.c",
+            LITTLEFS_DIR / "lfs.c",
+            LITTLEFS_DIR / "lfs_util.c",
         ),
     ),
     HostTest(

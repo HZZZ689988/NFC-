@@ -3,11 +3,13 @@
 C_SOURCES += \
 ../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
+../../app/Src/att_crc32.c \
 ../../app/Src/att_display.c \
 ../../app/Src/att_lfs_port.c \
 ../../app/Src/att_network.c \
 ../../app/Src/att_protocol.c \
 ../../app/Src/att_storage.c \
+../../app/Src/att_temperature.c \
 ../../app/Src/attendance_app.c \
 ../Bsp/NFC/board_spi_bus.c \
 ../../third_party/littlefs/lfs.c \

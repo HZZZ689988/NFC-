@@ -157,10 +157,12 @@ static void AttendanceApp_Bootstrap(void);
 static void AttendanceNetwork_InitDriver(void);
 static void AttendanceSerial_Send(const char *line, void *ctx);
 static void AttendanceFeedback_Send(attendance_feedback_event_t event, void *ctx);
+static void AttendanceApp_Reset(void *ctx);
 static void AttendanceFeedback_Play(attendance_feedback_event_t event);
 static void AttendanceFeedback_ClearExpired(void);
 static uint32_t AttendanceTime_Now(void *ctx);
 static uint32_t AttendanceTime_DateTimeToUnix(const BSP_RTC_DateTime_t *dt);
+static uint32_t AttendanceTime_LocalToUtcUnix(uint32_t local_unix, int8_t timezone);
 static void AttendanceStorage_Bootstrap(void);
 static void AttendanceStorage_PrintStatus(void);
 /* USER CODE END FunctionPrototypes */
@@ -289,6 +291,13 @@ static void AttendanceFeedback_Send(attendance_feedback_event_t event, void *ctx
   }
 }
 
+static void AttendanceApp_Reset(void *ctx)
+{
+  (void)ctx;
+  osDelay(200u);
+  NVIC_SystemReset();
+}
+
 static void AttendanceFeedback_Play(attendance_feedback_event_t event)
 {
   uint8_t led_mask = 0u;
@@ -356,7 +365,8 @@ static uint32_t AttendanceTime_Now(void *ctx)
   BSP_RTC_DateTime_t dt;
   if (BSP_RTC_GetDateTime(&dt) == HAL_OK && dt.year > 2020u)
   {
-    return AttendanceTime_DateTimeToUnix(&dt);
+    uint32_t local_unix = AttendanceTime_DateTimeToUnix(&dt);
+    return AttendanceTime_LocalToUtcUnix(local_unix, attendance_app_get_timezone());
   }
 
   return (uint32_t)(osKernelGetTickCount() / 1000u);
@@ -391,6 +401,20 @@ static uint32_t AttendanceTime_DateTimeToUnix(const BSP_RTC_DateTime_t *dt)
          (uint32_t)dt->hour * 3600u +
          (uint32_t)dt->minute * 60u +
          (uint32_t)dt->second;
+}
+
+static uint32_t AttendanceTime_LocalToUtcUnix(uint32_t local_unix, int8_t timezone)
+{
+  int32_t offset_sec = (int32_t)timezone * 3600;
+
+  if (offset_sec >= 0)
+  {
+    uint32_t offset = (uint32_t)offset_sec;
+    return local_unix > offset ? local_unix - offset : 0u;
+  }
+
+  uint32_t offset = (uint32_t)(-offset_sec);
+  return (UINT32_MAX - local_unix) > offset ? local_unix + offset : UINT32_MAX;
 }
 
 static void AttendanceStorage_Bootstrap(void)
@@ -488,6 +512,7 @@ void StartLedTask(void *argument)
   attendance_app_set_serial_send(AttendanceSerial_Send, &g_uart1Drv);
   attendance_app_set_time_source(AttendanceTime_Now, NULL);
   attendance_app_set_feedback(AttendanceFeedback_Send, NULL);
+  attendance_app_set_reset(AttendanceApp_Reset, NULL);
   if (serialRxQueueHandle != NULL)
   {
     UartDrv_RegisterRxQueue(&g_uart1Drv, serialRxQueueHandle);
@@ -497,7 +522,8 @@ void StartLedTask(void *argument)
   LED_SetLeds(0u);
 
   printf("NFC Attendance app started\r\n");
-  printf("K3=status K6=storage bootstrap L1=OK L2=invalid L3=duplicate L4=fault L5=network\r\n");
+  printf("ADMIN: K1=exit K2/K3=field K4/K5=value K6=save/reset\r\n");
+  printf("Normal: K2/K3=OLED page K6=storage bootstrap L1=OK L2=invalid L3=duplicate L4=fault L5=network\r\n");
 
   /* Infinite loop */
   for(;;)
@@ -517,16 +543,61 @@ void StartLedTask(void *argument)
     AttendanceFeedback_ClearExpired();
     MIDI_Tick();
 
-    /* K3: report LittleFS ownership */
-    if (Key_IsShortPressed(KEY_K3))
+    if (attendance_app_admin_is_active() != 0u)
     {
-      AttendanceStorage_PrintStatus();
+      attendance_admin_result_t adminResult = ATT_ADMIN_RESULT_IGNORED;
+      if (Key_IsShortPressed(KEY_K1))
+      {
+        adminResult = attendance_app_admin_handle_action(ATT_ADMIN_ACTION_EXIT);
+      }
+      if (Key_IsShortPressed(KEY_K2) || Key_IsRepeat(KEY_K2))
+      {
+        adminResult = attendance_app_admin_handle_action(ATT_ADMIN_ACTION_PREV_FIELD);
+      }
+      if (Key_IsShortPressed(KEY_K3) || Key_IsRepeat(KEY_K3))
+      {
+        adminResult = attendance_app_admin_handle_action(ATT_ADMIN_ACTION_NEXT_FIELD);
+      }
+      if (Key_IsShortPressed(KEY_K4) || Key_IsRepeat(KEY_K4))
+      {
+        adminResult = attendance_app_admin_handle_action(ATT_ADMIN_ACTION_DEC);
+      }
+      if (Key_IsShortPressed(KEY_K5) || Key_IsRepeat(KEY_K5))
+      {
+        adminResult = attendance_app_admin_handle_action(ATT_ADMIN_ACTION_INC);
+      }
+      if (Key_IsShortPressed(KEY_K6))
+      {
+        adminResult = attendance_app_admin_handle_action(ATT_ADMIN_ACTION_SAVE);
+      }
+      if (adminResult == ATT_ADMIN_RESULT_SAVED)
+      {
+        osDelay(300u);
+        NVIC_SystemReset();
+      }
     }
-
-    /* K6: re-run storage bootstrap */
-    if (Key_IsShortPressed(KEY_K6))
+    else
     {
-      AttendanceStorage_Bootstrap();
+      if (Key_IsShortPressed(KEY_K2) || Key_IsRepeat(KEY_K2))
+      {
+        (void)att_display_page_prev();
+      }
+
+      /* K3: next OLED detail page; if no detail page is active, report storage. */
+      uint8_t k3Short = Key_IsShortPressed(KEY_K3);
+      if (k3Short || Key_IsRepeat(KEY_K3))
+      {
+        if (att_display_page_next() == 0u && k3Short)
+        {
+          AttendanceStorage_PrintStatus();
+        }
+      }
+
+      /* K6: re-run storage bootstrap */
+      if (Key_IsShortPressed(KEY_K6))
+      {
+        AttendanceStorage_Bootstrap();
+      }
     }
 
     osDelay(KEY_SCAN_INTERVAL_MS);  /* 10ms 扫描周期 */

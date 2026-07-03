@@ -5,6 +5,8 @@ __pycache__/
 venv/
 
 pc_tool/data/
+pc_tool/build/
+pc_tool/dist/
 server/data/
 *.db
 *.sqlite

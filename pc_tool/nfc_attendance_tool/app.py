@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -20,11 +21,16 @@ from .protocol import (
     CardType,
     DeviceConfigPayload,
     PersonPayload,
+    build_card_lock,
     build_clear,
     build_config_commands,
     build_config_query,
     build_issue,
     build_list,
+    build_network_query,
+    build_ota_download,
+    build_ota_install_reset,
+    build_ota_status_query,
     build_read,
     build_time_query,
     build_update_image,
@@ -48,7 +54,10 @@ class AttendanceApp(tk.Tk):
         self.geometry("1180x760")
         self.minsize(1040, 680)
 
-        base_dir = Path(__file__).resolve().parents[1]
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).resolve().parent
+        else:
+            base_dir = Path(__file__).resolve().parents[1]
         self.data_dir = base_dir / "data"
         self.db = Database(self.data_dir / "attendance.db")
         self.ui_queue: queue.Queue[tuple[str, object]] = queue.Queue()
@@ -354,6 +363,14 @@ class AttendanceApp(tk.Tk):
         self.force_weather_btn.pack(side=tk.LEFT)
         self.query_time_btn = ttk.Button(actions, text="读取时间", command=self.query_time)
         self.query_time_btn.pack(side=tk.LEFT, padx=8)
+        self.query_network_btn = ttk.Button(actions, text="NET?", command=self.query_network)
+        self.query_network_btn.pack(side=tk.LEFT)
+        self.query_ota_btn = ttk.Button(actions, text="OTA?", command=self.query_ota_status)
+        self.query_ota_btn.pack(side=tk.LEFT, padx=(8, 0))
+        self.start_ota_btn = ttk.Button(actions, text="OTA!", command=self.start_ota_download)
+        self.start_ota_btn.pack(side=tk.LEFT, padx=(8, 0))
+        self.ota_reset_btn = ttk.Button(actions, text="OTARST", command=self.reboot_for_ota_install)
+        self.ota_reset_btn.pack(side=tk.LEFT, padx=(8, 0))
         self.serial_buttons.extend([
             self.query_config_btn,
             self.write_config_btn,
@@ -361,6 +378,10 @@ class AttendanceApp(tk.Tk):
             self.write_weather_test_btn,
             self.force_weather_btn,
             self.query_time_btn,
+            self.query_network_btn,
+            self.query_ota_btn,
+            self.start_ota_btn,
+            self.ota_reset_btn,
         ])
 
     def build_log_tab(self) -> None:
@@ -592,6 +613,20 @@ class AttendanceApp(tk.Tk):
     def query_time(self) -> None:
         self.run_serial_job("读取时间", [build_time_query()], expect_multi=True)
 
+    def query_network(self) -> None:
+        self.run_serial_job("NET?", [build_network_query()], expect_multi=True)
+
+    def query_ota_status(self) -> None:
+        self.run_serial_job("OTA?", [build_ota_status_query()], expect_multi=True, use_card_lock=False)
+
+    def start_ota_download(self) -> None:
+        self.run_serial_job("OTA!", [build_ota_download()], expect_multi=True, use_card_lock=False)
+
+    def reboot_for_ota_install(self) -> None:
+        if not messagebox.askyesno(APP_TITLE, "纭畾瑕侀噸鍚苟瀹夎宸查獙璇佺殑 OTA 鍥哄寲浠跺悧?"):
+            return
+        self.run_serial_job("OTARST", [build_ota_install_reset()], expect_multi=True, use_card_lock=False)
+
     def run_serial_job(
         self,
         title: str,
@@ -600,6 +635,7 @@ class AttendanceApp(tk.Tk):
         action: str = "",
         expect_multi: bool = False,
         import_records: bool = False,
+        use_card_lock: bool = True,
     ) -> None:
         if not self.client.is_open:
             messagebox.showwarning(APP_TITLE, "请先打开串口")
@@ -612,8 +648,18 @@ class AttendanceApp(tk.Tk):
 
         def worker() -> None:
             ok = True
+            lock_acquired = False
             try:
                 self.ui_queue.put(("status", f"{title}中..."))
+                if use_card_lock:
+                    lock_command = build_card_lock(True)
+                    self.ui_queue.put(("log", f"> {lock_command.rstrip()}"))
+                    lock_lines = self.client.transact(lock_command, timeout=1.0)
+                    lock_acquired = any(line.strip().upper() == "OK:CARDLOCK:ON" for line in lock_lines)
+                    if not lock_acquired:
+                        ok = False
+                        raise RuntimeError("CARDLOCK:ON failed; burn the latest firmware before issuing cards")
+
                 for index, command in enumerate(commands, 1):
                     self.ui_queue.put(("log", f"> {command.rstrip()}"))
                     timeout = 4.0 if command.startswith("UPDATEIMG") else 2.0
@@ -641,6 +687,12 @@ class AttendanceApp(tk.Tk):
                 self.ui_queue.put(("log", f"! {title}异常：{exc}"))
                 self.ui_queue.put(("status", f"{title}失败"))
             finally:
+                if lock_acquired:
+                    unlock_command = build_card_lock(False)
+                    self.ui_queue.put(("log", f"> {unlock_command.rstrip()}"))
+                    unlock_lines = self.client.transact(unlock_command, timeout=1.0)
+                    if not any(line.strip().upper() == "OK:CARDLOCK:OFF" for line in unlock_lines):
+                        self.ui_queue.put(("log", "! CARDLOCK:OFF failed; reset the device before attendance demo"))
                 self.ui_queue.put(("serial_busy", False))
 
         threading.Thread(target=worker, daemon=True).start()

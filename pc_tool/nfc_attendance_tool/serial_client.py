@@ -80,6 +80,9 @@ class SerialClient:
                     or stripped.startswith("UID:")
                     or stripped.startswith("WEATHER:")
                     or stripped.startswith("TIME:")
+                    or stripped.startswith("NET:")
+                    or stripped.startswith("OTA:")
+                    or stripped.startswith("CARDLOCK:")
                     or stripped.startswith("ERR:")
                     or stripped == "LIST:END"
                 ):

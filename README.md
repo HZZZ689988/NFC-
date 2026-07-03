@@ -2,6 +2,8 @@
 
 NFC attendance system for STM32F407VET6, RC522, W25Q128, OLED, ESP01S and a Python upper-computer tool.
 
+中文使用说明见 [README_zh.md](README_zh.md)。
+
 ## Project Layout
 
 ```text

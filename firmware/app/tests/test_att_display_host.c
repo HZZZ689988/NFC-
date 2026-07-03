@@ -30,6 +30,7 @@ struct GUI_FONT {
 static const GUI_FONT g_default_font = {0};
 static const GUI_FONT *g_current_font = &g_default_font;
 const GUI_FONT GUI_FontHZ_SimSun_24 = {0};
+const GUI_FONT GUI_Font8_ASCII = {0};
 
 static void require_int(int condition, const char *message)
 {
@@ -66,7 +67,7 @@ void GUI_DispStringAt(const char *text, int x, int y)
 {
     (void)x;
     if (g_line_count < (sizeof(g_lines) / sizeof(g_lines[0]))) {
-        g_lines[g_line_count].row = y / 8;
+        g_lines[g_line_count].row = y;
         g_lines[g_line_count].font = g_current_font;
         snprintf(g_lines[g_line_count].text, sizeof(g_lines[g_line_count].text), "%s", text);
         g_line_count++;
@@ -124,20 +125,37 @@ static void test_display_draws_ready_then_releases_event(void)
     require_int(g_line_count == 2u, "ready page should use two 24px lines");
     require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24, "ready page should use SimSun 24");
     require_int(strcmp(line_at(0), "TAP CARD") == 0, "ready page should show tap prompt");
-    require_int(strcmp(line_at(4), "NET READY") == 0, "ready page should show network state");
+    require_int(strcmp(line_at(32), "NET READY") == 0, "ready page should show network state");
 
-    att_display_show_attendance_ok(3u, 1001u, 11u);
+    att_display_show_attendance_result(3u, 1001u, ATT_RECORD_IN, 11u, 0u, "OK", NULL);
     att_display_poll(11u);
-    require_int(g_line_count == 2u, "attendance OK should use two 24px lines");
-    require_int(strcmp(line_at(0), "OK") == 0, "attendance OK should show OK");
-    require_int(strcmp(line_at(4), "ID1001") == 0, "attendance OK should show SID");
+    require_int(g_line_count == 2u, "attendance OK page 1 should show two 24px lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
+                "attendance OK should use SimSun 24 detail font");
+    require_int(strcmp(line_at(0), "00:00 IN") == 0,
+                "attendance OK page 1 should show time and type");
+    require_int(strcmp(line_at(32), "ID1001") == 0,
+                "attendance OK page 1 should show SID");
 
-    att_display_poll(15u);
-    require_int(strcmp(line_at(0), "OK") == 0, "event page should hold before timeout");
+    require_int(att_display_page_next() == 1u, "attendance detail should page next");
+    att_display_poll(11u);
+    require_int(strcmp(line_at(0), "STAT OK") == 0,
+                "attendance OK page 2 should show status");
+    require_int(strcmp(line_at(32), "SEQ 3") == 0,
+                "attendance OK page 2 should show result");
 
-    att_display_poll(16u);
+    require_int(att_display_page_prev() == 1u, "attendance detail should page previous");
+    att_display_poll(11u);
+    require_int(strcmp(line_at(0), "00:00 IN") == 0,
+                "attendance OK page previous should restore page 1");
+
+    att_display_poll(40u);
+    require_int(strcmp(line_at(0), "00:00 IN") == 0, "event page should hold before timeout");
+
+    att_display_poll(41u);
     require_int(strcmp(line_at(0), "TAP CARD") == 0, "event page should release after timeout");
-    require_int(strcmp(line_at(4), "NET READY") == 0, "ready page should restore network state");
+    require_int(strcmp(line_at(32), "NET READY") == 0, "ready page should restore network state");
+    require_int(att_display_page_next() == 0u, "ready page should not consume page key");
 }
 
 static void test_display_draws_oled_gbk_demo_string(void)
@@ -165,20 +183,65 @@ static void test_display_draws_event_pages(void)
 
     att_display_show_attendance_duplicate(20u);
     att_display_poll(20u);
-    require_int(strcmp(line_at(0), "DUP") == 0, "duplicate page should show DUP");
-    require_int(strcmp(line_at(4), "WAIT") == 0, "duplicate page should show WAIT");
+    require_int(strcmp(line_at(0), "00:00 DUP") == 0, "duplicate page should show time/status");
+    require_int(strcmp(line_at(32), "ID----") == 0, "duplicate page should show empty SID");
     require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
-                "duplicate page should use SimSun 24");
+                "duplicate page should use SimSun 24 detail font");
+    require_int(att_display_page_next() == 1u, "duplicate page should page next");
+    att_display_poll(20u);
+    require_int(strcmp(line_at(0), "STAT DUP") == 0, "duplicate page 2 should show status");
+    require_int(strcmp(line_at(32), "WAIT") == 0, "duplicate page 2 should show result");
 
     att_display_show_attendance_invalid(21u);
     att_display_poll(21u);
-    require_int(strcmp(line_at(0), "BAD CARD") == 0, "invalid page should show BAD CARD");
-    require_int(strcmp(line_at(4), "CHECK") == 0, "invalid page should show CHECK");
+    require_int(strcmp(line_at(0), "00:00 ERR") == 0, "invalid page should show time/status");
+    require_int(strcmp(line_at(32), "ID----") == 0, "invalid page should show empty SID");
+    require_int(att_display_page_next() == 1u, "invalid page should page next");
+    att_display_poll(21u);
+    require_int(strcmp(line_at(0), "STAT ERR") == 0, "invalid page 2 should show error status");
+    require_int(strcmp(line_at(32), "BAD CARD") == 0, "invalid page 2 should show result");
 
     att_display_show_error("TEST", 22u);
     att_display_poll(22u);
-    require_int(strcmp(line_at(0), "ERROR") == 0, "error page should show ERROR");
-    require_int(strcmp(line_at(4), "TEST") == 0, "error page should show reason");
+    require_int(strcmp(line_at(0), "00:00 ERR") == 0, "error page should show time/status");
+    require_int(att_display_page_next() == 1u, "error page should page next");
+    att_display_poll(22u);
+    require_int(strcmp(line_at(0), "STAT ERR") == 0, "error page 2 should show status");
+    require_int(strcmp(line_at(32), "TEST") == 0, "error page 2 should show reason");
+}
+
+static void test_display_draws_out_duration_result(void)
+{
+    require_int(att_display_init() == ATT_OK, "display init should succeed");
+
+    att_display_show_attendance_result(4u, 1001u, ATT_RECORD_OUT, 1200u, 1200u, "OK", NULL);
+    att_display_poll(1200u);
+
+    require_int(strcmp(line_at(0), "00:20 OUT") == 0, "OUT page 1 should show time/type");
+    require_int(strcmp(line_at(32), "ID1001") == 0, "OUT page 1 should show SID");
+    require_int(att_display_page_next() == 1u, "OUT page should page next");
+    att_display_poll(1200u);
+    require_int(strcmp(line_at(0), "STAT OK") == 0, "OUT page 2 should show status");
+    require_int(strcmp(line_at(32), "DUR 0:20") == 0, "OUT page 2 should show duration result");
+}
+
+static void test_display_applies_timezone_for_valid_unix_time(void)
+{
+    att_device_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.timezone = 8;
+
+    require_int(att_display_init() == ATT_OK, "display init should succeed");
+    att_display_set_config(&config);
+
+    att_display_show_attendance_result(5u, 1001u, ATT_RECORD_IN,
+                                       1783004400u, 0u, "OK", NULL);
+    att_display_poll(1783004400u);
+
+    require_int(strcmp(line_at(0), "23:00 IN") == 0,
+                "valid Unix display time should apply UTC+8 timezone");
+    require_int(strcmp(line_at(32), "ID1001") == 0,
+                "timezone test should keep SID line");
 }
 
 static void test_display_draws_weather_page(void)
@@ -193,7 +256,36 @@ static void test_display_draws_weather_page(void)
     require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
                 "weather page should use SimSun 24");
     require_int(strcmp(line_at(0), "WEATHER") == 0, "weather page should show title");
-    require_int(strcmp(line_at(4), "Sunny 20C") == 0, "weather page should show cached text");
+    require_int(strcmp(line_at(32), "Sunny 20C") == 0, "weather page should show cached text");
+}
+
+static void test_display_draws_admin_pages(void)
+{
+    require_int(att_display_init() == ATT_OK, "display init should succeed");
+
+    att_display_show_admin(42u, ATT_MODE_CHECK_IN, 0u, NULL, 100u);
+    att_display_poll(100u);
+    require_int(g_line_count == 2u, "admin device page should use two 24px lines");
+    require_int(g_lines[0].font == &GUI_FontHZ_SimSun_24,
+                "admin page should use SimSun 24");
+    require_int(strcmp(line_at(0), "ADMIN DEV") == 0,
+                "admin device page should show field title");
+    require_int(strcmp(line_at(32), "DEV 42") == 0,
+                "admin device page should show device id");
+
+    att_display_show_admin(42u, ATT_MODE_IN_OUT, 1u, NULL, 101u);
+    att_display_poll(101u);
+    require_int(strcmp(line_at(0), "ADMIN MODE") == 0,
+                "admin mode page should show field title");
+    require_int(strcmp(line_at(32), "MODE AUTO") == 0,
+                "admin mode page should show in-out mode");
+
+    att_display_show_admin(42u, ATT_MODE_IN_OUT, 1u, "DENY CARD", 102u);
+    att_display_poll(102u);
+    require_int(strcmp(line_at(0), "ADMIN") == 0,
+                "admin message page should show admin title");
+    require_int(strcmp(line_at(32), "DENY CARD") == 0,
+                "admin message page should show message");
 }
 
 int main(void)
@@ -201,6 +293,9 @@ int main(void)
     test_display_draws_ready_then_releases_event();
     test_display_draws_oled_gbk_demo_string();
     test_display_draws_event_pages();
+    test_display_draws_out_duration_result();
+    test_display_applies_timezone_for_valid_unix_time();
     test_display_draws_weather_page();
+    test_display_draws_admin_pages();
     return 0;
 }

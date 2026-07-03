@@ -14,6 +14,17 @@
 # target
 ######################################
 TARGET = Demo_W25Q128
+ifeq ($(APP_OFFSET),1)
+TARGET = Demo_W25Q128_App
+endif
+ifeq ($(APP_SLOT),A)
+TARGET = Demo_W25Q128_AppA
+APP_OFFSET = 1
+endif
+ifeq ($(APP_SLOT),B)
+TARGET = Demo_W25Q128_AppB
+APP_OFFSET = 1
+endif
 ifeq ($(RC522_ONLY_DIAG),1)
 TARGET = RC522_Only_Diag
 endif
@@ -33,6 +44,15 @@ OPT = -Og
 #######################################
 # Build path
 BUILD_DIR = build
+ifeq ($(APP_OFFSET),1)
+BUILD_DIR = build_app
+endif
+ifeq ($(APP_SLOT),A)
+BUILD_DIR = build_app_a
+endif
+ifeq ($(APP_SLOT),B)
+BUILD_DIR = build_app_b
+endif
 ifeq ($(RC522_ONLY_DIAG),1)
 BUILD_DIR = build_rc522_only
 endif
@@ -61,11 +81,13 @@ C_SOURCES =  \
 ../../app/Src/attendance_app.c \
 ../../app/Src/att_card.c \
 ../../app/Src/att_crc16.c \
+../../app/Src/att_crc32.c \
 ../../app/Src/att_display.c \
 ../../app/Src/att_lfs_port.c \
 ../../app/Src/att_network.c \
 ../../app/Src/att_protocol.c \
 ../../app/Src/att_storage.c \
+../../app/Src/att_temperature.c \
 ../../third_party/littlefs/lfs.c \
 ../../third_party/littlefs/lfs_util.c \
 Core/Src/main.c \
@@ -177,6 +199,18 @@ C_DEFS =  \
 -DATT_ENABLE_NETWORK=1 \
 -DATT_ENABLE_DISPLAY=1
 
+ifeq ($(APP_OFFSET),1)
+ifeq ($(APP_SLOT),)
+C_DEFS += -DUSER_VECT_TAB_ADDRESS -DVECT_TAB_OFFSET=0x00010000U -DATT_APP_BASE_ADDRESS=0x08010000U
+endif
+endif
+ifeq ($(APP_SLOT),A)
+C_DEFS += -DUSER_VECT_TAB_ADDRESS -DVECT_TAB_OFFSET=0x00010000U -DATT_APP_BASE_ADDRESS=0x08010000U
+endif
+ifeq ($(APP_SLOT),B)
+C_DEFS += -DUSER_VECT_TAB_ADDRESS -DVECT_TAB_OFFSET=0x00040000U -DATT_APP_BASE_ADDRESS=0x08040000U
+endif
+
 ifeq ($(RC522_ONLY_DIAG),1)
 C_DEFS += -DRC522_ONLY_DIAG
 endif
@@ -248,6 +282,17 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 #######################################
 # link script
 LDSCRIPT = STM32F407XX_FLASH.ld
+ifeq ($(APP_OFFSET),1)
+ifeq ($(APP_SLOT),)
+LDSCRIPT = STM32F407XX_APP.ld
+endif
+endif
+ifeq ($(APP_SLOT),A)
+LDSCRIPT = STM32F407XX_APP.ld
+endif
+ifeq ($(APP_SLOT),B)
+LDSCRIPT = STM32F407XX_APP_B.ld
+endif
 
 # libraries
 LIBS = -lc -lm -lnosys 

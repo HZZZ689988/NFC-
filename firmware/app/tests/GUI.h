@@ -16,5 +16,6 @@ const GUI_FONT *GUI_SetFont(const GUI_FONT *font);
 void GUI_Update(void);
 
 extern const GUI_FONT GUI_FontHZ_SimSun_24;
+extern const GUI_FONT GUI_Font8_ASCII;
 
 #endif

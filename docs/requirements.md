@@ -65,8 +65,13 @@ The device must:
 - Query weather data.
 - Send heartbeat packets to the server.
 - Upload pending attendance records.
+- Batch multiple pending attendance records where possible.
 - Keep records pending while offline.
 - Retry upload after network recovery.
+- Refresh a server-managed blacklist and reject matching cards locally.
+- Use CRC checking on TCP attendance protocol frames.
+- Let the server store device state and attendance records in a database and
+  expose a Web backend for devices, records and blacklist management.
 
 ## 6. Storage Requirements
 
@@ -117,7 +122,9 @@ A complete demo must show:
 - Device survives reset without losing the record.
 - Upper-computer imports the record.
 - ESP01S uploads the record to the test server.
-- Server logs heartbeat and upload packets.
+- Server logs heartbeat/upload packets and stores upload records in a database.
+- Web backend shows devices and attendance records, and can manage blacklist
+  UIDs for local reject tests.
 
 ## 9. Validation Requirements
 
